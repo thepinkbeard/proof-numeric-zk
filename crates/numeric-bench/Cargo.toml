@@ -1,0 +1,18 @@
+[package]
+name = "numeric-bench"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+numeric-core = { path = "../numeric-core" }
+numeric-reference = { path = "../numeric-reference" }
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "limb_arithmetic"
+harness = false
+

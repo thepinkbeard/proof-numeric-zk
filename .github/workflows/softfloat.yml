@@ -1,0 +1,38 @@
+name: Validação diferencial e soundness
+
+# `ubuntu-latest` é x86_64 Linux, que é o único host onde `softfloat-sys`
+# compila. Rodar aqui dispensa a emulação de `scripts/run_softfloat_validation.sh`.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  berkeley-softfloat:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: proof_numeric
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependências nativas
+        # m4 para gmp-mpfr-sys, cmake para o c99 transitivo de SoftFloat.
+        run: sudo apt-get update && sudo apt-get install -y m4 cmake
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85.0"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: proof_numeric
+
+      - name: Berkeley SoftFloat contra a referência FP32 do projeto
+        run: cargo test -p softfloat-validation --release
+
+      - name: Soundness por enumeração exaustiva em formato reduzido
+        run: cargo test -p numeric-core --test exhaustive_soundness --release
+
+      - name: Vínculo de escalonamento
+        run: cargo test -p nova-circuit escalation --release

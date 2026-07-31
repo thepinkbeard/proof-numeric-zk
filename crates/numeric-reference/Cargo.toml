@@ -1,0 +1,17 @@
+[package]
+name = "numeric-reference"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+num-bigint.workspace = true
+num-rational.workspace = true
+num-traits.workspace = true
+rug.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+softfloat = "1.0.0"

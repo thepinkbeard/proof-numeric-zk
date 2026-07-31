@@ -1,0 +1,13 @@
+[package]
+name = "softfloat-validation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# `softfloat-sys` só compila em x86_64 Linux: o build script decide pelo host, e
+# por isso a dependência fica restrita a esse alvo em vez de valer para todo
+# x86_64. Ver 0007 e 0022.
+[target.'cfg(all(target_arch = "x86_64", target_os = "linux"))'.dev-dependencies]
+softfloat-wrapper = "0.3.4"
+numeric-reference = { path = "../../crates/numeric-reference" }

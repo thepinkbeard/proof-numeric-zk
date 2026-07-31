@@ -1,0 +1,29 @@
+[package]
+name = "nova-circuit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bincode.workspace = true
+clap.workspace = true
+ff.workspace = true
+libc.workspace = true
+nova-snark.workspace = true
+num-bigint.workspace = true
+num-rational.workspace = true
+num-traits.workspace = true
+numeric-core = { path = "../numeric-core" }
+numeric-reference = { path = "../numeric-reference" }
+serde.workspace = true
+serde_json.workspace = true
+
+[[bin]]
+name = "nova-circuit"
+path = "src/main.rs"
+
+[[bin]]
+name = "escalation-cost"
+path = "src/bin/escalation_cost.rs"

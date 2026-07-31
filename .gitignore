@@ -1,0 +1,8 @@
+/target/
+/data/*.csv
+/data/*.json
+/results/*.csv
+/results/*.json
+/results/*.svg
+/results/*.png
+
