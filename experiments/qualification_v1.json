@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "protocol_id": "qualification-dynamics-v1",
+  "generator": "splitmix64-v1",
+  "seeds": [20260908,20260909,20260910,20260911,20260912,20260913,20260914,20260915,20260916,20260917],
+  "inputs_per_seed": 100,
+  "horizons": [10,30,100,300,1000],
+  "precision_ladder": [16,32,48,64],
+  "logistic_parameters": ["7/2","37/10","39/10","4"],
+  "affine_parameters": [["1/2","3/4"],["7/10","1/2"]],
+  "logistic_thresholds": ["1/4","1/2","3/4"],
+  "affine_thresholds": ["1","5/4","3/2"],
+  "reference_max_bits": 16384,
+  "public_inputs": true,
+  "proof_horizons": [2,10],
+  "timing_rounds": 30
+}

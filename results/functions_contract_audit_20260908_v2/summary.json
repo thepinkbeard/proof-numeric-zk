@@ -1,0 +1,35 @@
+[
+  {
+    "reference_inconclusive_count": 0,
+    "numeric_profile_hash_hex": "f02422bfc9f5294b2b23fb4e6338dc9fe6dbfb747214537a46809768d111d4f1",
+    "function": "exp",
+    "approximation_method": "taylor",
+    "approximation_order": 3,
+    "integer_bits": 8,
+    "fractional_bits": 8,
+    "rounding": "floor",
+    "semantic_class": "bounded-approximation",
+    "numeric_samples": 24,
+    "max_absolute_error": 0.054219328459045237,
+    "rmse": 0.01799152394152467,
+    "decision_opportunities": 72,
+    "predicate_flip_count": 7,
+    "first_predicate_flip": {
+      "sample_set": "boundary",
+      "sample_index": 1,
+      "decision_threshold": "1/2"
+    },
+    "certified_stable_count": 49,
+    "ambiguous_count": 23,
+    "observed_same_count": 0,
+    "observed_flip_count": 0,
+    "certified_coverage": 0.6805555555555556,
+    "mean_evaluation_runtime_ns": 367005.2083333333,
+    "operation_count_per_evaluation": 6,
+    "multiplication_count_per_evaluation": 3,
+    "numerical_multiplicative_depth": 3,
+    "verification_relation_depth": null,
+    "estimated_constraints": null,
+    "actual_constraints": null
+  }
+]

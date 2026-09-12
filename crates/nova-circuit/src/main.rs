@@ -1,11 +1,11 @@
 use anyhow::{bail, Context, Result};
 use clap::{Parser, ValueEnum};
 use nova_circuit::{
-    circuit_decision, common_threshold, power_of_two_biased_exponent, AffineParameters,
-    AffineStepCircuit, AffineStepWitness, CarryLogisticStepCircuit, CbdAffineStepCircuit,
-    CbdAffineStepWitness, CbdLogisticStepCircuit, CbdRadiusBound, CbdSequentialLogisticStepCircuit,
-    CbdSequentialStepWitness, CbdStepWitness, CfdLogisticStepCircuit, CfdLogisticStepWitness,
-    initial_fixed_point_state,
+    circuit_decision, common_threshold, initial_fixed_point_state, power_of_two_biased_exponent,
+    AffineParameters, AffineStepCircuit, AffineStepWitness, CarryLogisticStepCircuit,
+    CbdAffineStepCircuit, CbdAffineStepWitness, CbdLogisticStepCircuit, CbdRadiusBound,
+    CbdSequentialLogisticStepCircuit, CbdSequentialStepWitness, CbdStepWitness,
+    CdadFixedLogisticStepCircuit, CfdLogisticStepCircuit, CfdLogisticStepWitness,
     CfdStableStepCircuit, CfdStableStepWitness, CfdTopology, CircuitFp32, CircuitRounding,
     CompensatedLogisticStepCircuit, CompensatedStepWitness, Fp32MulCircuit, Fp32MulWitness,
     Fp32SubOneCircuit, Fp32SubOneWitness, LogisticStepCircuit, ProductCarryWitness,
@@ -82,6 +82,12 @@ struct Args {
     innovation: String,
     #[arg(long, default_value = "results/nova_metrics.json")]
     output: PathBuf,
+    /// Export an independently verifiable compressed proof (new directory only).
+    #[arg(long, conflicts_with = "verify_proof")]
+    export_proof: Option<PathBuf>,
+    /// Verify against the independently supplied CLI statement; never trust a supplied verification key.
+    #[arg(long, conflicts_with = "export_proof")]
+    verify_proof: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -131,6 +137,7 @@ enum RepresentationArg {
     Cbd,
     CbdGlobal,
     CbdSequential,
+    Cdad,
     Cfd,
     CfdFused,
     CfdStable,
@@ -152,6 +159,7 @@ impl RepresentationArg {
             | Self::Cbd
             | Self::CbdGlobal
             | Self::CbdSequential
+            | Self::Cdad
             | Self::Cfd
             | Self::CfdFused
             | Self::Fp32 => None,
@@ -162,6 +170,7 @@ impl RepresentationArg {
         match self {
             Self::Standard | Self::Carry | Self::Compensated => ProfileFamily::FixedPoint,
             Self::Cbd | Self::CbdGlobal | Self::CbdSequential => ProfileFamily::Cbd,
+            Self::Cdad => ProfileFamily::Cdad,
             Self::Cfd | Self::CfdFused | Self::CfdStable => ProfileFamily::Cfd,
             Self::Fp32 | Self::Fp32Stable => ProfileFamily::Fp32,
         }
@@ -185,6 +194,8 @@ struct Config {
     alpha: BigRational,
     innovation: BigRational,
     output: PathBuf,
+    export_proof: Option<PathBuf>,
+    verify_proof: Option<PathBuf>,
 }
 
 fn parse_rational(text: &str) -> Result<BigRational> {
@@ -220,7 +231,10 @@ fn parse_rational(text: &str) -> Result<BigRational> {
             .parse()
             .with_context(|| format!("parte fracionária inválida em {trimmed:?}"))?;
         let denominator = BigInt::from(10u8).pow(digits.len() as u32);
-        let magnitude = BigRational::new(integer_part.abs() * &denominator + fraction_part, denominator);
+        let magnitude = BigRational::new(
+            integer_part.abs() * &denominator + fraction_part,
+            denominator,
+        );
         return Ok(if negative { -magnitude } else { magnitude });
     }
     let integer: BigInt = trimmed
@@ -253,7 +267,11 @@ fn parse_lane_range(text: &str) -> Result<Vec<i16>> {
 /// As mesmas condições existem como `assert` em `cfd::validate_profile`; aqui
 /// elas viram erro de CLI para que uma varredura da matriz experimental não
 /// aborte com panic no meio da execução.
-fn validate_cfd_corridor(lanes: &[i16], precision_bits: usize, workload: WorkloadArg) -> Result<()> {
+fn validate_cfd_corridor(
+    lanes: &[i16],
+    precision_bits: usize,
+    workload: WorkloadArg,
+) -> Result<()> {
     if lanes.is_empty() || lanes.len() > 32 {
         bail!(
             "--exponent-lanes deve descrever de 1 a 32 faixas, recebeu {}",
@@ -326,7 +344,7 @@ impl Config {
 
         let family = representation.family();
         let precision_bits = match family {
-            ProfileFamily::FixedPoint | ProfileFamily::Cbd => {
+            ProfileFamily::FixedPoint | ProfileFamily::Cbd | ProfileFamily::Cdad => {
                 let derived = LIMB_WIDTH_BITS * k;
                 if let Some(requested) = args.precision {
                     if requested != derived {
@@ -420,6 +438,8 @@ impl Config {
             alpha,
             innovation,
             output: args.output.clone(),
+            export_proof: args.export_proof.clone(),
+            verify_proof: args.verify_proof.clone(),
         })
     }
 
@@ -604,6 +624,8 @@ struct Metrics {
     nova_snark_version: &'static str,
     curve_cycle: &'static str,
     commitment: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proof_artifact_mode: Option<&'static str>,
     profile_hash_hex: String,
     workload: &'static str,
     p: usize,
@@ -663,14 +685,47 @@ struct IvcRun {
 ///
 /// Todas as representações passam por este caminho, de modo que diferenças
 /// medidas venham do circuito e não da instrumentação.
-fn run_ivc<C>(circuits: &[C], z0: &[Scalar], steps: usize, compress: bool) -> Result<IvcRun>
+fn run_ivc<C>(circuits: &[C], z0: &[Scalar], config: &Config) -> Result<IvcRun>
 where
     C: StepCircuit<Scalar> + Clone,
 {
+    let steps=config.steps;
+    let compress=config.compress || config.export_proof.is_some();
+    let statement=serde_json::json!({"schema_version":1,"input":config.x0.to_string(),
+        "r":config.r.to_string(),"alpha":config.alpha.to_string(),"innovation":config.innovation.to_string(),
+        "horizon":steps,"threshold":config.threshold.to_string(),"precision":config.precision_bits,
+        "family":format!("{:?}",config.representation),"rounding":config.rounding.label(),
+        "workload":config.workload.label(),"exponent_lanes":config.exponent_lanes,"radius_bits":config.radius_bits,
+        "input_contract":"public-canonical-v1","z0":z0});
+    if let Some(path)=&config.export_proof {fs::create_dir(path).context("proof output must not exist")?;}
+    if let Some(path)=&config.verify_proof {
+        let supplied:serde_json::Value=serde_json::from_slice(&fs::read(path.join("statement.json"))?)?;
+        if supplied!=statement {bail!("proof statement does not match authorized CLI input/profile/horizon");}
+    }
     let started = Instant::now();
     let pp = PublicParams::<E1, E2, C>::setup(&circuits[0], &*S1::ck_floor(), &*S2::ck_floor())
         .context("PublicParams::setup")?;
     let setup_seconds = started.elapsed().as_secs_f64();
+
+    if let Some(path)=&config.verify_proof {
+        let started=Instant::now();
+        let (_,vk)=CompressedSNARK::<E1,E2,C,S1,S2>::setup(&pp)?;
+        let verifier_key_setup_seconds=started.elapsed().as_secs_f64();
+        let started=Instant::now();
+        let bytes=fs::read(path.join("proof.bin"))?;
+        let (proof,used):(CompressedSNARK<E1,E2,C,S1,S2>,usize)=bincode::serde::decode_from_slice(&bytes,bincode::config::legacy())?;
+        if used!=bytes.len() {bail!("trailing proof bytes");}
+        let result=proof.verify(&vk,steps,z0).context("independent compressed verification")?;
+        let claimed:Vec<Scalar>=serde_json::from_slice(&fs::read(path.join("terminal.json"))?)?;
+        if result!=claimed {bail!("terminal state mismatch");}
+        let verify_seconds=started.elapsed().as_secs_f64();
+        let (primary_constraints,secondary_constraints)=pp.num_constraints();
+        let (primary_variables,secondary_variables)=pp.num_variables();
+        return Ok(IvcRun{primary_constraints,secondary_constraints,primary_variables,secondary_variables,
+            setup_seconds,prover_total_seconds:0.0,recursive_verify_seconds:0.0,
+            compression_setup_seconds:Some(verifier_key_setup_seconds),compression_seconds:None,
+            compressed_verify_seconds:Some(verify_seconds),compressed_proof_bytes_bincode:Some(bytes.len())});
+    }
 
     let mut recursive =
         RecursiveSNARK::<E1, E2, C>::new(&pp, &circuits[0], z0).context("RecursiveSNARK::new")?;
@@ -707,10 +762,15 @@ where
         compressed_proof_bytes_bincode = Some(encoded.len());
 
         let started = Instant::now();
-        compressed
+        let terminal = compressed
             .verify(&vk, steps, z0)
             .context("CompressedSNARK::verify")?;
         compressed_verify_seconds = Some(started.elapsed().as_secs_f64());
+        if let Some(path)=&config.export_proof {
+            fs::write(path.join("proof.bin"),&encoded)?;
+            fs::write(path.join("statement.json"),serde_json::to_vec_pretty(&statement)?)?;
+            fs::write(path.join("terminal.json"),serde_json::to_vec_pretty(&terminal)?)?;
+        }
     }
 
     let (primary_constraints, secondary_constraints) = pp.num_constraints();
@@ -757,7 +817,8 @@ fn assemble(
     Metrics {
         nova_snark_version: "0.73.0",
         curve_cycle: "Pallas/Vesta",
-        commitment,
+        commitment: if config.export_proof.is_some() || config.verify_proof.is_some() {"Public canonical boundary verification + Pedersen/IPA"} else {commitment},
+        proof_artifact_mode: if config.verify_proof.is_some() {Some("independent-verify-only")} else if config.export_proof.is_some() {Some("export-compressed")} else {None},
         profile_hash_hex: profile.profile_hash_hex(),
         workload: WorkloadId::from(config.workload).tag(),
         p: legacy_p,
@@ -855,7 +916,9 @@ fn fixed_initial_state_vector<const K: usize>(
     let numerator = if is_one {
         1_u128 << (16 * K)
     } else {
-        limbs.iter().fold(0_u128, |acc, limb| (acc << 16) + *limb as u128)
+        limbs
+            .iter()
+            .fold(0_u128, |acc, limb| (acc << 16) + *limb as u128)
     };
     let mut values = Vec::with_capacity(K + 3);
     values.push(0);
@@ -883,8 +946,7 @@ fn circuits<const K: usize>(config: &Config) -> Result<Vec<LogisticStepCircuit<K
     let (r_num, r_den) = config.r_parts()?;
     let threshold_numerator = config.fixed_threshold_numerator()?;
     let rounding = config.rounding;
-    let mut limbs = initial_limbs::<K>(config, rounding);
-    let mut is_one = false;
+    let (mut limbs, mut is_one) = initial_fixed_point_state::<K>(&config.x0, rounding);
     let mut result = Vec::with_capacity(config.steps);
     for _ in 0..config.steps {
         let witness = StepWitness::compute_with_rounding(limbs, is_one, r_num, r_den, rounding);
@@ -1044,13 +1106,12 @@ fn fp32_circuits(config: &Config) -> Result<Vec<RestrictedFp32StepCircuit>> {
     let mut input_bits = rational_to_f32(&config.x0, "x0")?.to_bits();
     let mut result = Vec::with_capacity(config.steps);
     for _ in 0..config.steps {
-        let witness =
-            RestrictedFp32StepWitness::compute_with_threshold(
-                input_bits,
-                parameter_bits,
-                threshold_biased,
-            )
-            .context("testemunha da etapa FP32 restrita")?;
+        let witness = RestrictedFp32StepWitness::compute_with_threshold(
+            input_bits,
+            parameter_bits,
+            threshold_biased,
+        )
+        .context("testemunha da etapa FP32 restrita")?;
         input_bits = witness.output.bits();
         result.push(RestrictedFp32StepCircuit {
             witness,
@@ -1416,7 +1477,7 @@ fn execute<const K: usize>(config: &Config) -> Result<Metrics> {
         .map(Scalar::from)
         .collect::<Vec<_>>();
 
-    let run = run_ivc(&circuits, &z0, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &z0, config)?;
     let raw = raw_step_constraints(config, &circuits[0]);
     let breakdown = circuits[0].breakdown();
     let profile = config.profile(RepresentationId::Standard)?;
@@ -1450,7 +1511,7 @@ fn execute_carry<const K: usize>(config: &Config) -> Result<Metrics> {
         .map(Scalar::from)
         .collect::<Vec<_>>();
 
-    let run = run_ivc(&circuits, &z0, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &z0, config)?;
     let raw = raw_carry_step_constraints(config, &circuits[0]);
     let multiplication_relations = K * K;
     let division_relations = 2;
@@ -1489,7 +1550,7 @@ fn execute_compensated(config: &Config) -> Result<Metrics> {
         .map(Scalar::from)
         .collect::<Vec<_>>();
 
-    let run = run_ivc(&circuits, &z0, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &z0, config)?;
     let raw = raw_compensated_step_constraints(config, &circuits[0]);
     let multiplication_relations = 2;
     let division_relations = 1;
@@ -1546,8 +1607,7 @@ fn affine_parameters(config: &Config) -> Result<AffineParameters> {
             bail!("--{name} precisa de numerador e denominador abaixo de 2^16");
         }
     }
-    let parameters =
-        AffineParameters::new(alpha_num, alpha_den, innovation_num, innovation_den);
+    let parameters = AffineParameters::new(alpha_num, alpha_den, innovation_num, innovation_den);
     let (attractor_num, attractor_den) = parameters.attractor();
     if attractor_num >= 2 * attractor_den {
         bail!(
@@ -1613,8 +1673,7 @@ fn execute_affine<const K: usize>(config: &Config) -> Result<Metrics> {
 
     let mut circuits = Vec::with_capacity(config.steps);
     for _ in 0..config.steps {
-        let witness =
-            AffineStepWitness::<K>::compute(limbs, high, parameters, config.rounding);
+        let witness = AffineStepWitness::<K>::compute(limbs, high, parameters, config.rounding);
         limbs = witness.output_limbs;
         high = witness.output_high;
         circuits.push(AffineStepCircuit::<K> {
@@ -1629,7 +1688,7 @@ fn execute_affine<const K: usize>(config: &Config) -> Result<Metrics> {
         .iter()
         .map(|value| field_from_u128_main::<Scalar>(*value))
         .collect::<Vec<_>>();
-    let run = run_ivc(&circuits, &scalars, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &scalars, config)?;
 
     let mut cs = TestConstraintSystem::<Scalar>::new();
     let z = allocate_wide_state(&mut cs, "affine_z", &z0);
@@ -1715,7 +1774,7 @@ fn execute_cbd_affine<const K: usize>(config: &Config) -> Result<Metrics> {
         .iter()
         .map(|value| field_from_u128_main::<Scalar>(*value))
         .collect::<Vec<_>>();
-    let run = run_ivc(&circuits, &scalars, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &scalars, config)?;
 
     let mut cs = TestConstraintSystem::<Scalar>::new();
     let z = allocate_wide_state(&mut cs, "cbd_affine_z", &z0);
@@ -1763,7 +1822,7 @@ fn execute_cbd<const K: usize>(config: &Config, radius_bound: CbdRadiusBound) ->
         .map(field_from_u128_main::<Scalar>)
         .collect::<Vec<_>>();
 
-    let run = run_ivc(&circuits, &z0, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &z0, config)?;
     let raw = raw_cbd_step_constraints(config, &circuits[0]);
     let multiplication_relations = match radius_bound {
         CbdRadiusBound::Global => 1,
@@ -1802,6 +1861,59 @@ fn execute_cbd<const K: usize>(config: &Config, radius_bound: CbdRadiusBound) ->
     ))
 }
 
+fn execute_cdad<const K: usize>(config: &Config) -> Result<Metrics> {
+    let inner = cbd_circuits::<K>(config, CbdRadiusBound::LocalTaylor)?;
+    let circuits = inner
+        .into_iter()
+        .map(CdadFixedLogisticStepCircuit::new)
+        .collect::<Vec<_>>();
+    let mut z0_values = cbd_initial_state_vector::<K>(config);
+    z0_values.push((16 * K) as u128);
+    let z0 = z0_values
+        .iter()
+        .copied()
+        .map(field_from_u128_main::<Scalar>)
+        .collect::<Vec<_>>();
+    let run = run_ivc(&circuits, &z0, config)?;
+
+    let mut cs = TestConstraintSystem::<Scalar>::new();
+    let z = allocate_wide_state(&mut cs, "cdad_z", &z0_values);
+    circuits[0]
+        .synthesize(&mut cs, &z)
+        .expect("síntese CDAD fixa");
+    assert!(cs.is_satisfied(), "{:?}", cs.which_is_unsatisfied());
+    let raw = cs.num_constraints();
+    let multiplication_relations = 3;
+    let division_relations = 2;
+    let canonicality = 2 * (K + 1) + 10;
+    let counter = 1;
+    let representation = RepresentationId::CdadFixed;
+    let profile = config.profile(representation)?;
+    Ok(assemble(
+        config,
+        &profile,
+        representation,
+        "nearest_ties_to_even_decision_adaptive_fixed",
+        "Pedersen + IPA; Poseidon link between profiles",
+        LIMB_WIDTH_BITS,
+        K,
+        CdadFixedLogisticStepCircuit::<K>::arity_value(),
+        raw,
+        Breakdown {
+            range_checks: raw.saturating_sub(
+                multiplication_relations + division_relations + canonicality + counter,
+            ),
+            multiplication_relations,
+            division_relations,
+            canonicality,
+            counter,
+        },
+        run,
+        None,
+        None,
+    ))
+}
+
 fn execute_cbd_sequential<const K: usize>(config: &Config) -> Result<Metrics> {
     let circuits = cbd_sequential_circuits::<K>(config)?;
     let z0 = cbd_initial_state_vector::<K>(config)
@@ -1809,7 +1921,7 @@ fn execute_cbd_sequential<const K: usize>(config: &Config) -> Result<Metrics> {
         .map(field_from_u128_main::<Scalar>)
         .collect::<Vec<_>>();
 
-    let run = run_ivc(&circuits, &z0, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &z0, config)?;
     let raw = raw_cbd_sequential_step_constraints(config, &circuits[0]);
     let multiplication_relations = 3;
     let division_relations = 4;
@@ -1853,7 +1965,7 @@ fn execute_cfd(config: &Config, topology: CfdTopology) -> Result<Metrics> {
         .map(field_from_u128_main::<Scalar>)
         .collect::<Vec<_>>();
 
-    let run = run_ivc(&circuits, &z0, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &z0, config)?;
     let raw = raw_cfd_step_constraints(&circuits[0], &state);
     let multiplication_relations = match topology {
         CfdTopology::Sequential => 12,
@@ -1877,8 +1989,7 @@ fn execute_cfd(config: &Config, topology: CfdTopology) -> Result<Metrics> {
         CfdLogisticStepCircuit::arity_value(),
         raw,
         Breakdown {
-            range_checks: raw
-                .saturating_sub(multiplication_relations + canonicality + counter),
+            range_checks: raw.saturating_sub(multiplication_relations + canonicality + counter),
             multiplication_relations,
             division_relations: 0,
             canonicality,
@@ -1902,7 +2013,7 @@ fn execute_cfd_stable(config: &Config) -> Result<Metrics> {
         .map(field_from_u128_main::<Scalar>)
         .collect::<Vec<_>>();
 
-    let run = run_ivc(&circuits, &z0, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &z0, config)?;
     let raw = raw_cfd_stable_step_constraints(&circuits[0], &state);
     let multiplication_relations = 6;
     let canonicality = 14;
@@ -1919,8 +2030,7 @@ fn execute_cfd_stable(config: &Config) -> Result<Metrics> {
         CfdStableStepCircuit::arity_value(),
         raw,
         Breakdown {
-            range_checks: raw
-                .saturating_sub(multiplication_relations + canonicality + counter),
+            range_checks: raw.saturating_sub(multiplication_relations + canonicality + counter),
             multiplication_relations,
             division_relations: 0,
             canonicality,
@@ -1940,7 +2050,7 @@ fn execute_fp32(config: &Config) -> Result<Metrics> {
         .map(Scalar::from)
         .collect::<Vec<_>>();
 
-    let run = run_ivc(&circuits, &z0, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &z0, config)?;
     let raw = raw_fp32_step_constraints(&circuits[0], initial);
     let range_checks = RestrictedFp32StepCircuit::range_check_constraints();
     let multiplication_relations = 6;
@@ -1980,7 +2090,7 @@ fn execute_fp32_stable(config: &Config) -> Result<Metrics> {
         .map(Scalar::from)
         .collect::<Vec<_>>();
 
-    let run = run_ivc(&circuits, &z0, config.steps, config.compress)?;
+    let run = run_ivc(&circuits, &z0, config)?;
     let raw = raw_fp32_stable_step_constraints(&circuits[0], initial);
     let profile = config.profile(RepresentationId::Fp32Exact)?;
     Ok(assemble(
@@ -2042,7 +2152,9 @@ fn run(config: &Config) -> Result<Metrics> {
                 _ => unreachable!("--k é validado em 1..=4"),
             }
         }
-        RepresentationArg::Cbd | RepresentationArg::CbdGlobal | RepresentationArg::CbdSequential
+        RepresentationArg::Cbd
+        | RepresentationArg::CbdGlobal
+        | RepresentationArg::CbdSequential
             if config.workload == WorkloadArg::StableAffine =>
         {
             require_nearest_even(config, "CBD")?;
@@ -2115,6 +2227,19 @@ fn run(config: &Config) -> Result<Metrics> {
                 _ => unreachable!("--k é validado em 1..=4"),
             }
         }
+        RepresentationArg::Cdad => {
+            require_nearest_even(config, "CDAD")?;
+            if config.workload != WorkloadArg::LogisticMap {
+                bail!("o protótipo Nova CDAD v1 implementa o mapa logístico");
+            }
+            match config.k {
+                1 => execute_cdad::<1>(config),
+                2 => execute_cdad::<2>(config),
+                3 => execute_cdad::<3>(config),
+                4 => execute_cdad::<4>(config),
+                _ => unreachable!("--k é validado em 1..=4"),
+            }
+        }
         RepresentationArg::Cfd | RepresentationArg::CfdFused | RepresentationArg::CfdStable => {
             require_nearest_even(config, "CFD")?;
             if config.k != 1 {
@@ -2145,6 +2270,9 @@ fn run(config: &Config) -> Result<Metrics> {
 fn main() -> Result<()> {
     let args = Args::parse();
     let config = Config::resolve(&args)?;
+    if (config.export_proof.is_some() || config.verify_proof.is_some()) && config.output.exists() {
+        bail!("proof artifact metrics output must not already exist");
+    }
     if config.representation == RepresentationArg::Compensated {
         require_logistic(&config, "a representação compensada")?;
     }

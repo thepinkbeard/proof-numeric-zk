@@ -5,6 +5,7 @@
 //! ambos os lados constroem o mesmo [`ExperimentProfile`] e publicam o
 //! `profile_hash_hex` definido em `docs/pareto-protocol.md`.
 
+use crate::{CommitmentPolicy, PrecisionPolicy};
 use num_bigint::Sign;
 use num_rational::BigRational;
 use serde::{Deserialize, Serialize};
@@ -14,6 +15,7 @@ use thiserror::Error;
 /// Versão da serialização canônica. Qualquer mudança de layout exige
 /// incremento, porque ela invalida hashes gravados em rodadas anteriores.
 pub const PROFILE_SCHEMA_VERSION: u16 = 1;
+pub const ADAPTIVE_PROFILE_SCHEMA_VERSION: u16 = 2;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -29,6 +31,7 @@ pub enum WorkloadId {
 pub enum ProfileFamily {
     FixedPoint,
     Cbd,
+    Cdad,
     Cfd,
     Fp32,
 }
@@ -40,6 +43,7 @@ pub enum BoundMode {
     None,
     GlobalLipschitz,
     LocalTaylor,
+    DecisionAdaptive,
     /// Enclosure intervalar por extremos, usada pela CFD.
     Interval,
 }
@@ -74,6 +78,8 @@ pub enum ProfileError {
     PrincipalThresholdNotDeclared,
     #[error("parâmetro público duplicado: {0}")]
     DuplicateParameter(String),
+    #[error("configuração adaptativa inválida: {0}")]
+    InvalidAdaptive(&'static str),
 }
 
 /// Descreve uma configuração completa do protocolo de Pareto.
@@ -97,6 +103,12 @@ pub struct ExperimentProfile {
     principal_threshold: BigRational,
     minimum: BigRational,
     maximum: BigRational,
+    #[serde(default)]
+    precision_ladder: Vec<usize>,
+    #[serde(default)]
+    precision_policy: Option<PrecisionPolicy>,
+    #[serde(default)]
+    commitment_policy: Option<CommitmentPolicy>,
 }
 
 /// Construtor incremental de [`ExperimentProfile`].
@@ -119,6 +131,9 @@ pub struct ExperimentProfileBuilder {
     principal_threshold: Option<BigRational>,
     minimum: BigRational,
     maximum: BigRational,
+    precision_ladder: Vec<usize>,
+    precision_policy: Option<PrecisionPolicy>,
+    commitment_policy: Option<CommitmentPolicy>,
 }
 
 impl ExperimentProfileBuilder {
@@ -143,6 +158,9 @@ impl ExperimentProfileBuilder {
             principal_threshold: None,
             minimum: BigRational::from_integer(0.into()),
             maximum: BigRational::from_integer(1.into()),
+            precision_ladder: Vec::new(),
+            precision_policy: None,
+            commitment_policy: None,
         }
     }
 
@@ -192,6 +210,18 @@ impl ExperimentProfileBuilder {
         self
     }
 
+    pub fn adaptive(
+        mut self,
+        precision_ladder: impl IntoIterator<Item = usize>,
+        precision_policy: PrecisionPolicy,
+        commitment_policy: CommitmentPolicy,
+    ) -> Self {
+        self.precision_ladder = precision_ladder.into_iter().collect();
+        self.precision_policy = Some(precision_policy);
+        self.commitment_policy = Some(commitment_policy);
+        self
+    }
+
     pub fn build(self) -> Result<ExperimentProfile, ProfileError> {
         if self.representation.is_empty() {
             return Err(ProfileError::EmptyRepresentation);
@@ -227,8 +257,40 @@ impl ExperimentProfileBuilder {
         exponent_lanes.sort_unstable();
         exponent_lanes.dedup();
 
+        let adaptive = self.precision_policy.is_some() || self.commitment_policy.is_some();
+        if adaptive {
+            if self.family != ProfileFamily::Cdad || self.bound_mode != BoundMode::DecisionAdaptive
+            {
+                return Err(ProfileError::InvalidAdaptive(
+                    "perfil adaptativo deve usar família CDAD e bound decision-adaptive",
+                ));
+            }
+            if self.precision_ladder.is_empty()
+                || self
+                    .precision_ladder
+                    .windows(2)
+                    .any(|pair| pair[0] >= pair[1])
+                || self.precision_policy.is_none()
+                || self.commitment_policy.is_none()
+            {
+                return Err(ProfileError::InvalidAdaptive(
+                    "escada e políticas adaptativas são obrigatórias",
+                ));
+            }
+        } else if self.family == ProfileFamily::Cdad
+            || self.bound_mode == BoundMode::DecisionAdaptive
+        {
+            return Err(ProfileError::InvalidAdaptive(
+                "família CDAD exige configuração adaptativa",
+            ));
+        }
+
         Ok(ExperimentProfile {
-            schema_version: PROFILE_SCHEMA_VERSION,
+            schema_version: if adaptive {
+                ADAPTIVE_PROFILE_SCHEMA_VERSION
+            } else {
+                PROFILE_SCHEMA_VERSION
+            },
             workload: self.workload,
             family: self.family,
             representation: self.representation,
@@ -243,6 +305,9 @@ impl ExperimentProfileBuilder {
             principal_threshold,
             minimum: self.minimum,
             maximum: self.maximum,
+            precision_ladder: self.precision_ladder,
+            precision_policy: self.precision_policy,
+            commitment_policy: self.commitment_policy,
         })
     }
 }
@@ -302,6 +367,15 @@ impl ExperimentProfile {
     pub fn maximum(&self) -> &BigRational {
         &self.maximum
     }
+    pub fn precision_ladder(&self) -> &[usize] {
+        &self.precision_ladder
+    }
+    pub fn precision_policy(&self) -> Option<PrecisionPolicy> {
+        self.precision_policy
+    }
+    pub fn commitment_policy(&self) -> Option<CommitmentPolicy> {
+        self.commitment_policy
+    }
 
     pub fn parameter(&self, name: &str) -> Option<&BigRational> {
         self.parameters
@@ -338,6 +412,27 @@ impl ExperimentProfile {
         put_rational(&mut out, &self.principal_threshold);
         put_rational(&mut out, &self.minimum);
         put_rational(&mut out, &self.maximum);
+        if self.schema_version >= ADAPTIVE_PROFILE_SCHEMA_VERSION {
+            out.extend_from_slice(&(self.precision_ladder.len() as u32).to_be_bytes());
+            for bits in &self.precision_ladder {
+                out.extend_from_slice(&(*bits as u32).to_be_bytes());
+            }
+            put_bytes(
+                &mut out,
+                self.precision_policy
+                    .expect("schema v2 exige política de precisão")
+                    .tag()
+                    .as_bytes(),
+            );
+            put_bytes(
+                &mut out,
+                commitment_policy_tag(
+                    self.commitment_policy
+                        .expect("schema v2 exige política de compromisso"),
+                )
+                .as_bytes(),
+            );
+        }
         out
     }
 
@@ -347,13 +442,12 @@ impl ExperimentProfile {
 
     pub fn profile_hash_hex(&self) -> String {
         use std::fmt::Write;
-        self.profile_hash().iter().fold(
-            String::with_capacity(64),
-            |mut accumulator, byte| {
+        self.profile_hash()
+            .iter()
+            .fold(String::with_capacity(64), |mut accumulator, byte| {
                 let _ = write!(accumulator, "{byte:02x}");
                 accumulator
-            },
-        )
+            })
     }
 }
 
@@ -370,6 +464,7 @@ fn family_tag(value: ProfileFamily) -> &'static str {
     match value {
         ProfileFamily::FixedPoint => "fixed-point",
         ProfileFamily::Cbd => "cbd",
+        ProfileFamily::Cdad => "cdad",
         ProfileFamily::Cfd => "cfd",
         ProfileFamily::Fp32 => "fp32",
     }
@@ -380,7 +475,14 @@ fn bound_mode_tag(value: BoundMode) -> &'static str {
         BoundMode::None => "none",
         BoundMode::GlobalLipschitz => "global-lipschitz",
         BoundMode::LocalTaylor => "local-taylor",
+        BoundMode::DecisionAdaptive => "decision-adaptive",
         BoundMode::Interval => "interval",
+    }
+}
+
+fn commitment_policy_tag(value: CommitmentPolicy) -> &'static str {
+    match value {
+        CommitmentPolicy::ExistingPoseidonLink => "existing-poseidon-link",
     }
 }
 
@@ -475,7 +577,9 @@ mod tests {
         let profile = sample().build().unwrap();
         let hex = profile.profile_hash_hex();
         assert_eq!(hex.len(), 64);
-        assert!(hex.chars().all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
+        assert!(hex
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
         assert_eq!(hex, sample().build().unwrap().profile_hash_hex());
     }
 
@@ -506,7 +610,10 @@ mod tests {
     #[test]
     fn distinct_configurations_produce_distinct_hashes() {
         let base = sample().build().unwrap();
-        let other_bound = sample().bound_mode(BoundMode::GlobalLipschitz).build().unwrap();
+        let other_bound = sample()
+            .bound_mode(BoundMode::GlobalLipschitz)
+            .build()
+            .unwrap();
         let other_topology = sample().topology(Topology::Sequential).build().unwrap();
         let other_parameter = ExperimentProfile::builder(
             WorkloadId::LogisticMap,
@@ -542,5 +649,46 @@ mod tests {
             .build()
             .unwrap_err();
         assert_eq!(error, ProfileError::DuplicateParameter("r".to_string()));
+    }
+
+    #[test]
+    fn only_adaptive_profiles_use_schema_v2() {
+        let legacy = sample().build().unwrap();
+        assert_eq!(legacy.schema_version(), PROFILE_SCHEMA_VERSION);
+        assert!(legacy.precision_ladder().is_empty());
+
+        let adaptive = ExperimentProfile::builder(
+            WorkloadId::LogisticMap,
+            ProfileFamily::Cdad,
+            "cdad-margin-directed",
+            16,
+        )
+        .bound_mode(BoundMode::DecisionAdaptive)
+        .thresholds([BigRational::new(1.into(), 2.into())])
+        .adaptive(
+            [16, 32, 48, 64],
+            PrecisionPolicy::MarginDirected,
+            CommitmentPolicy::ExistingPoseidonLink,
+        )
+        .build()
+        .unwrap();
+        assert_eq!(adaptive.schema_version(), ADAPTIVE_PROFILE_SCHEMA_VERSION);
+        assert_eq!(adaptive.precision_ladder(), &[16, 32, 48, 64]);
+        assert_ne!(legacy.profile_hash_hex(), adaptive.profile_hash_hex());
+    }
+
+    #[test]
+    fn cdad_without_adaptive_contract_is_rejected() {
+        let error = ExperimentProfile::builder(
+            WorkloadId::LogisticMap,
+            ProfileFamily::Cdad,
+            "cdad-incomplete",
+            16,
+        )
+        .bound_mode(BoundMode::DecisionAdaptive)
+        .thresholds([BigRational::new(1.into(), 2.into())])
+        .build()
+        .unwrap_err();
+        assert!(matches!(error, ProfileError::InvalidAdaptive(_)));
     }
 }

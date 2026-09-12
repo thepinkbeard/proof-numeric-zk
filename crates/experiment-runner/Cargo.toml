@@ -10,15 +10,18 @@ default-run = "experiment-runner"
 anyhow.workspace = true
 clap.workspace = true
 csv.workspace = true
+libc.workspace = true
 num-bigint.workspace = true
 num-rational.workspace = true
 num-traits.workspace = true
+numeric-approximations = { path = "../numeric-approximations" }
 numeric-core = { path = "../numeric-core" }
 numeric-reference = { path = "../numeric-reference" }
 nova-circuit = { path = "../nova-circuit" }
 rug.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 
 [[bin]]
 name = "experiment-runner"
@@ -35,3 +38,11 @@ path = "src/bin/cfd_eval.rs"
 [[bin]]
 name = "frontier-eval"
 path = "src/bin/frontier_eval.rs"
+
+[[bin]]
+name = "function-eval"
+path = "src/bin/function_eval.rs"
+
+[[bin]]
+name = "contract-audit"
+path = "src/bin/contract_audit.rs"

@@ -16,9 +16,10 @@ use num_rational::BigRational;
 use num_traits::{One, ToPrimitive};
 
 mod affine;
-pub mod escalation;
 mod cfd;
+pub mod escalation;
 mod fp32;
+mod score;
 
 pub use affine::{
     AffineParameters, AffineStepCircuit, AffineStepWitness, CbdAffineStepCircuit,
@@ -36,6 +37,7 @@ pub use fp32::{
     RestrictedFp32StableStepWitness, RestrictedFp32StepCircuit, RestrictedFp32StepWitness,
     HALF_BIASED_EXPONENT, ONE_BIASED_EXPONENT,
 };
+pub use score::{CdadLinearScoreCircuit, CdadLinearScoreWitness, SignedCdadValue};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StepWitness<const K: usize> {
@@ -365,6 +367,80 @@ pub struct CbdLogisticStepCircuit<const K: usize> {
 impl<const K: usize> CbdLogisticStepCircuit<K> {
     pub fn arity_value() -> usize {
         K + 4 // iteration, K limbs, is_one, radius, decision(x>=1/2)
+    }
+}
+
+/// Fixed-precision CDAD step used by the first Nova prototype.
+///
+/// The numeric transition is exactly the CBD local-Taylor circuit.  The extra
+/// state element constrains the selected precision to the member `16*K` of the
+/// public CDAD ladder.  Heterogeneous precision changes remain separate linked
+/// proofs in v1, as required by the experimental protocol.
+#[derive(Clone, Debug)]
+pub struct CdadFixedLogisticStepCircuit<const K: usize> {
+    pub inner: CbdLogisticStepCircuit<K>,
+    pub precision_ladder: [usize; 4],
+}
+
+impl<const K: usize> CdadFixedLogisticStepCircuit<K> {
+    pub fn new(inner: CbdLogisticStepCircuit<K>) -> Self {
+        let selected = 16 * K;
+        let precision_ladder = [16, 32, 48, 64];
+        assert!(precision_ladder.contains(&selected));
+        Self {
+            inner,
+            precision_ladder,
+        }
+    }
+
+    pub fn arity_value() -> usize {
+        CbdLogisticStepCircuit::<K>::arity_value() + 1
+    }
+
+    pub const fn selected_fractional_bits() -> usize {
+        16 * K
+    }
+}
+
+impl<F: PrimeField, const K: usize> StepCircuit<F> for CdadFixedLogisticStepCircuit<K> {
+    fn arity(&self) -> usize {
+        Self::arity_value()
+    }
+
+    fn synthesize<CS: ConstraintSystem<F>>(
+        &self,
+        cs: &mut CS,
+        z: &[AllocatedNum<F>],
+    ) -> Result<Vec<AllocatedNum<F>>, SynthesisError> {
+        assert_eq!(z.len(), Self::arity_value());
+        assert!(self
+            .precision_ladder
+            .contains(&Self::selected_fractional_bits()));
+        let selected = &z[z.len() - 1];
+        cs.enforce(
+            || "cdad selected precision belongs to compiled ladder rung",
+            |lc| lc,
+            |lc| lc,
+            |lc| {
+                lc + selected.get_variable()
+                    - (F::from(Self::selected_fractional_bits() as u64), CS::one())
+            },
+        );
+        let mut output = self.inner.synthesize(cs, &z[..z.len() - 1])?;
+        let next_selected =
+            AllocatedNum::alloc(cs.namespace(|| "cdad selected precision"), || {
+                selected
+                    .get_value()
+                    .ok_or(SynthesisError::AssignmentMissing)
+            })?;
+        cs.enforce(
+            || "cdad precision remains fixed inside one Nova instance",
+            |lc| lc,
+            |lc| lc,
+            |lc| lc + selected.get_variable() - next_selected.get_variable(),
+        );
+        output.push(next_selected);
+        Ok(output)
     }
 }
 
@@ -871,9 +947,7 @@ pub fn quantize_dyadic(
     let remainder = (&raw % &denominator)
         .to_u128()
         .expect("resto da quantização cabe em u128");
-    let denominator = denominator
-        .to_u128()
-        .expect("denominador cabe em u128");
+    let denominator = denominator.to_u128().expect("denominador cabe em u128");
     let rounded_up = should_round_up_u128(floor, remainder, denominator, rounding);
     (floor + u128::from(rounded_up), remainder != 0)
 }
@@ -1065,7 +1139,8 @@ where
 {
     assert!(threshold > 0);
     let decided_true = value_witness >= threshold;
-    let decision = allocate_boolean_num(cs.namespace(|| "decision"), "decision_value", decided_true)?;
+    let decision =
+        allocate_boolean_num(cs.namespace(|| "decision"), "decision_value", decided_true)?;
     let true_diff_witness = if decided_true {
         value_witness - threshold
     } else {
@@ -1092,9 +1167,7 @@ where
     cs.enforce(
         || format!("{name} true proves value >= threshold"),
         |lc| lc + decision.get_variable(),
-        |lc| {
-            lc + value.get_variable() - (threshold_field, CS::one()) - true_diff.get_variable()
-        },
+        |lc| lc + value.get_variable() - (threshold_field, CS::one()) - true_diff.get_variable(),
         |lc| lc,
     );
     cs.enforce(
@@ -1279,8 +1352,7 @@ where
         |lc| lc,
         |lc| lc,
         |lc| {
-            lc + decision_true.get_variable()
-                + (F::from(2), decision_indeterminate.get_variable())
+            lc + decision_true.get_variable() + (F::from(2), decision_indeterminate.get_variable())
                 - decision_code.get_variable()
         },
     );

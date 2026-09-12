@@ -1,0 +1,216 @@
+{
+  "arch": "aarch64",
+  "canonical_inputs": {
+    "ecef_left": [
+      [
+        [
+          1,
+          [
+            1,
+            128
+          ]
+        ],
+        [
+          1,
+          [
+            0,
+            256
+          ]
+        ]
+      ],
+      [
+        [
+          0,
+          []
+        ],
+        [
+          1,
+          [
+            1
+          ]
+        ]
+      ],
+      [
+        [
+          0,
+          []
+        ],
+        [
+          1,
+          [
+            1
+          ]
+        ]
+      ]
+    ],
+    "ecef_right": [
+      [
+        [
+          0,
+          []
+        ],
+        [
+          1,
+          [
+            1
+          ]
+        ]
+      ],
+      [
+        [
+          0,
+          []
+        ],
+        [
+          1,
+          [
+            1
+          ]
+        ]
+      ],
+      [
+        [
+          0,
+          []
+        ],
+        [
+          1,
+          [
+            1
+          ]
+        ]
+      ]
+    ],
+    "sigmoid": [
+      [
+        [
+          -1,
+          [
+            3
+          ]
+        ],
+        [
+          1,
+          [
+            4
+          ]
+        ]
+      ],
+      [
+        [
+          -1,
+          [
+            1
+          ]
+        ],
+        [
+          1,
+          [
+            4
+          ]
+        ]
+      ],
+      [
+        [
+          1,
+          [
+            1
+          ]
+        ],
+        [
+          1,
+          [
+            2
+          ]
+        ]
+      ],
+      [
+        [
+          1,
+          [
+            7
+          ]
+        ],
+        [
+          1,
+          [
+            8
+          ]
+        ]
+      ]
+    ]
+  },
+  "cargo_lock_sha256": "3f4f3a853337cda178902202721bbe0bbcdf1add09155736add348e0f635f0d2",
+  "contract_preparation_ns": 15140041,
+  "cryptographic_guarantee": false,
+  "git_commit": "9e1314bdd88c03e62b87ff5075a743d93a2d2cea",
+  "git_dirty": true,
+  "os": "macos",
+  "performance_claim": false,
+  "protocol_sha256": "df52aad0ab437c152b699674ef8f021a470a8409bcc0f9af9ab8d39e20d11fdb",
+  "reference_precision_bits": 512,
+  "relation_provenance": "our-extension",
+  "rows": 8,
+  "run_kind": "deterministic-audit-smoke-not-performance-campaign",
+  "rustc": "rustc 1.85.0 (4d91de4e4 2025-02-17)",
+  "schema_version": 1,
+  "source_file_sha256": {
+    "Cargo.lock": "3f4f3a853337cda178902202721bbe0bbcdf1add09155736add348e0f635f0d2",
+    "Cargo.toml": "b24f8a2148c8382bd04165ca4fcc0a36d21348b640026e035519597ba9bd4bbf",
+    "crates/.DS_Store": "3a480c76b90d58a5d6d455e0b7519e2ce57bf2183889c8b75d14b06d6ff2224d",
+    "crates/experiment-runner/.DS_Store": "04787f259149ee352e51d88ccdb53ef555729248581f2834adbb8efd6433d15d",
+    "crates/experiment-runner/Cargo.toml": "e4a6840be4e2d1dcd51fdf338e6e6894b2f78b1ef92b2bac7ef5692ff10d8de1",
+    "crates/experiment-runner/src/bin/cfd_eval.rs": "a2b4f441131bb37b06279918a314391023a65eb059f5b2e16e075ff2e63c1060",
+    "crates/experiment-runner/src/bin/contract_audit.rs": "21aa3b8790f8796ae1213d1b2ff7b09d03b6b55a1727f8467b4d82eb20921721",
+    "crates/experiment-runner/src/bin/frontier_eval.rs": "5d88891268c5bfdf484d30a1c5b31853528dbc8b3b71483dd64505de01f5655b",
+    "crates/experiment-runner/src/bin/function_eval.rs": "f726d7e6a65133ae65c9f5d98664050d6901c2effce660e59cfe4488bd52bbef",
+    "crates/experiment-runner/src/bin/workload_eval.rs": "d45525d82f66abdc142e6079c4e1c38e7b1d91c4d291c4fb3344817ddfa02538",
+    "crates/experiment-runner/src/main.rs": "ccbca01aa24e175897f880a85d4d8e1ba1932aa87e76d6d203f0aa68a45694f6",
+    "crates/nova-circuit/Cargo.toml": "a070f5658665674df48cc1088bdb60a32c0f21ad0beca709f0bf1b0b4450817c",
+    "crates/nova-circuit/src/affine.rs": "53f17b4bcde248a6ab9261f752f6d43ab38587b0b4a62b8ea3286fd992f81797",
+    "crates/nova-circuit/src/bin/cdad_cost.rs": "9b06efa9a0cce405aa14430321b29a7f417d0c95eb75cb935f5cba777f73fa2c",
+    "crates/nova-circuit/src/bin/escalation_cost.rs": "5ea4bdbccdd28a52a9ef22fb4a45098ec7f4d69ae3a574aec0b4da4bceedeec4",
+    "crates/nova-circuit/src/cfd.rs": "3be581b06dca09c97a124805ed5929ab8d6825c281486421d25a2c791a6ef425",
+    "crates/nova-circuit/src/escalation.rs": "11b5cbc55b1d5cf5dd2bc88dfed16a8f33ee4bae1be8a41239f228dd8644458b",
+    "crates/nova-circuit/src/fp32.rs": "ea3066ea17f76e459c2f45f1fa3ac0ff3e51aacdf00c6de5f6df2c42c1ae1b60",
+    "crates/nova-circuit/src/lib.rs": "eb663326d37321decb111fadf68ffa0f17b951bc0b5076b47cf2dba218b58b10",
+    "crates/nova-circuit/src/main.rs": "a273727803f62bd8707652b47c0e0dc3e7315a8e35e22f8678b20edff75cb24e",
+    "crates/nova-circuit/src/score.rs": "633d8ae164af79084d8c03e00526c4c5d6b0c2736ba779aaf493807ee78c9ae9",
+    "crates/nova-circuit/tests/step_circuit.rs": "27402d5d1df8573802c7a36cdca8f75d0ccd2fbe5a0ab60336230809d52e1590",
+    "crates/numeric-approximations/Cargo.toml": "c73e4ce5976412e03bfe4fc1c83df8bf76a2ad1077a54316e980b468f69657e4",
+    "crates/numeric-approximations/src/certified_sigmoid.rs": "813fe85d986b018ecfcce4ae20301e5cfe4e20c95c649f81c14f6bc19b03cc91",
+    "crates/numeric-approximations/src/gauss_legendre.rs": "3be6b6f9a663102366aef92b2530934b7753f696b9744f3d3c03222c95a7b135",
+    "crates/numeric-approximations/src/lib.rs": "1468f60e6b0453c786f22dbb517aef1268078c73eb1c7a91d960ec591e7951e3",
+    "crates/numeric-approximations/src/polynomial.rs": "5bef2650d98aade2aad568e1f700b6ebf84721d8d5d4582c945c7902874c5dc3",
+    "crates/numeric-approximations/src/series.rs": "f3c579b5bd04a9180a2e58bbe085acbb1a797518fd5c0cabcd4fabad26a378e3",
+    "crates/numeric-bench/Cargo.toml": "bf266cc8599593007847df4dcf5ee7575a5a0c70343e791ce4c5709c081f1bb3",
+    "crates/numeric-bench/benches/limb_arithmetic.rs": "158dbb573931aca657e66769e1a42b1fa4ca460e6493ef67c6ae2df54734d513",
+    "crates/numeric-bench/src/lib.rs": "bd62862ae8ababf417019300348494e273f14e8f70003b304ef36c57f1a32485",
+    "crates/numeric-core/Cargo.toml": "573952bf522cd7f16c31304002cc4616555c0c78093a313d34066dc999765434",
+    "crates/numeric-core/src/cbd.rs": "5550d11d71bfc78916de9d9233311e67d4c1ceadd3e80cf3e6589efaecc54a65",
+    "crates/numeric-core/src/cdad.rs": "a0284b67d55213a03c2cca2d7312b5b337a802f49dc7615ca3f54d68278affcf",
+    "crates/numeric-core/src/cfd.rs": "8139a49f3769a655ae6a88d545f8b9764037cd49e123240af2691a495e3a9c46",
+    "crates/numeric-core/src/contract_adaptive.rs": "1068bdb79973e592e37eb4aecf7f4dd8d8da285e0ad2dca8f2e813da1a7216c6",
+    "crates/numeric-core/src/contract_certificate.rs": "0c7e02652c4e32022ec4973db450a534dacf6f8d1156509d4d2ed6c902177ef2",
+    "crates/numeric-core/src/fixed_semantics.rs": "a86b15e8c974a46d78169eeec26e10dd5096d4b3fa1d86b34b5fda6ab87e5946",
+    "crates/numeric-core/src/frontier.rs": "6f751f55e6ab3650c8ae9eac45cae6f615fb34a91a111ae7c7b872be0f6f23fb",
+    "crates/numeric-core/src/lib.rs": "ea5f62a75108204d4072880edc98c3344d108015889be6a9d8d3d3187b3eebdb",
+    "crates/numeric-core/src/numeric_contract.rs": "e2194af9faef5a324ca70db2293b752e46f022aad72f14efb199d9e3a84705ce",
+    "crates/numeric-core/src/profile.rs": "3c41c29efcd5285803c364457977598c11e9873ff8b71ae9852310d7c5fffe70",
+    "crates/numeric-core/tests/cdad_soundness.rs": "18ee53be52b323d5a2f0f03af498ed91b33fce8dceee276be9345f3e98127255",
+    "crates/numeric-core/tests/certified_dyadic.proptest-regressions": "7ce8f676abd07fa4d2821313cbcf199e18f050f198d666cfb1fe8b2e858c06a3",
+    "crates/numeric-core/tests/certified_dyadic.rs": "ae9e1adb1445b7dc135df13c299a7b6156e94b60c33ae4a51701746cecc5402c",
+    "crates/numeric-core/tests/certified_float.rs": "cf601be01f9bdbeb0372346eaf027159fd73ff92b02f90c596cf89482972eeb5",
+    "crates/numeric-core/tests/exhaustive_soundness.rs": "ec819d3094cecd94b85fd5c17f2d1bdeb90f5584d76b111b60753de633d13fa7",
+    "crates/numeric-core/tests/limb_number.rs": "fa3046ef851807d11f98db6841b2db46f505c11114b5f16b772af89d1aa6e446",
+    "crates/numeric-core/tests/numeric_contract_profile.rs": "99e5616a9dc241d0eedbc45f76e198d5b47b57f2902045dbd50bf4ea40e362f8",
+    "crates/numeric-reference/Cargo.toml": "0474411cc9bbbeabef107101f90aaf3258ad6fa0a348a09c083587f98da20b39",
+    "crates/numeric-reference/src/fp32.rs": "2050b2c610a3dcdd55b97945c24c523ffeb560027cf4ebba860b20dc5a4fbe97",
+    "crates/numeric-reference/src/gauss_legendre.rs": "b9b5918900a61ade556f16c0440184fe442c6e9049434e760649ee6d7b4ce222",
+    "crates/numeric-reference/src/lib.rs": "b19f51b00f704b6795b18fe928a27dc42223c5c10d707febb6e78853568838e0",
+    "crates/numeric-reference/src/transcendental.rs": "8b01e69e0758b74bd164a0dd3fd525dd202b74ed8892119144040916e5e28771",
+    "experiments/cdad_contract_protocol_v1.json": "df52aad0ab437c152b699674ef8f021a470a8409bcc0f9af9ab8d39e20d11fdb",
+    "experiments/non_polynomial_v1.json": "4b220022435af498ac21a986985544fadc9050731553083d67a76dae238c73e0",
+    "experiments/sridhar_artifact_compat_v1.json": "00af2b5398a08715e30633e771a7bc4667ed5736d44a81d0a9a0024fbd7b631a"
+  }
+}

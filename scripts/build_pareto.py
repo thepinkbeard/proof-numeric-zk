@@ -30,6 +30,7 @@ SWEEP_DIR = ROOT / "results" / "nova_sweep"
 COVERAGE = ROOT / "results" / "frontier_coverage.json"
 OUTPUT_JSON = ROOT / "results" / "pareto_frontier.json"
 OUTPUT_CSV = ROOT / "results" / "pareto_frontier.csv"
+CDAD_COST = ROOT / "results" / "cdad_precision_cost.json"
 
 # Abaixo disso a junção está quebrada, não incompleta: vale interromper em vez
 # de publicar uma fronteira construída sobre um punhado de pontos.
@@ -86,6 +87,45 @@ def load_link_cost(path: Path) -> int | None:
     return max(point["link_constraints"] for point in points)
 
 
+def load_cdad_cost(path: Path) -> dict[str, dict[int, int]]:
+    if not path.exists():
+        return {}
+    payload = load_json(path)
+    catalog = {"default": {
+        int(bits): point["raw_step_constraints"]
+        for bits, point in payload["costs"].items()
+    }}
+    score_costs = payload.get("score_costs", {})
+    workload_sources = {
+        "adult-logistic": "adult_6_terms",
+        "ecef-proximity": "ecef_3_terms",
+    }
+    for workload, source in workload_sources.items():
+        if source in score_costs:
+            catalog[workload] = {
+                int(bits): point["raw_step_constraints"]
+                for bits, point in score_costs[source].items()
+            }
+    return catalog
+
+
+def adaptive_cdad_cost(
+    record: dict, catalog: dict[str, dict[int, int]], link_cost: int | None
+) -> float | None:
+    """Measured mean constraints per opportunity, including every linked retry."""
+    histogram = record.get("attempted_precision_histogram")
+    opportunities = record.get("opportunities", 0)
+    costs = catalog.get(record.get("workload"), catalog.get("default", {}))
+    if not histogram or not opportunities or link_cost is None or not costs:
+        return None
+    try:
+        numeric = sum(int(count) * costs[int(bits)] for bits, count in histogram.items())
+    except KeyError:
+        return None
+    links = record.get("linked_retries") or 0
+    return (numeric + links * link_cost) / opportunities
+
+
 def escalation_cost(
     costs: dict[str, dict],
     coverage: list[dict],
@@ -127,13 +167,16 @@ def escalation_cost(
 
 
 def pareto_front(points: list[dict]) -> list[dict]:
-    """Pontos não dominados em (custo por decisão correta, taxa de erro).
+    """Pontos não dominados em custo, erro e disponibilidade.
 
-    Dois eixos e não um: ordenar só por custo por decisão correta faria um
+    Três eixos: ordenar só por custo por decisão correta faria um
     formato que erra metade das decisões parecer barato, porque o denominador já
     desconta os erros mas o consumidor não sabe quais decisões descontar. A taxa
     de decisões incorretas entra como eixo próprio para que a dominância exija
-    ser melhor nos dois.
+    ser melhor nos dois. Disponibilidade também permanece explícita: duas
+    configurações com zero erro podem oferecer produtos diferentes quando uma
+    se abstém muito mais. Sem este eixo, o perfil fixo barato eliminaria toda
+    política adaptativa antes mesmo de comparar a recuperação das abstenções.
     """
     usable = [point for point in points if point["cost_per_correct"] is not None]
     front = []
@@ -142,9 +185,11 @@ def pareto_front(points: list[dict]) -> list[dict]:
             other is not candidate
             and other["cost_per_correct"] <= candidate["cost_per_correct"]
             and other["unsound_rate"] <= candidate["unsound_rate"]
+            and (other["availability"] or 0.0) >= (candidate["availability"] or 0.0)
             and (
                 other["cost_per_correct"] < candidate["cost_per_correct"]
                 or other["unsound_rate"] < candidate["unsound_rate"]
+                or (other["availability"] or 0.0) > (candidate["availability"] or 0.0)
             )
             for other in usable
         )
@@ -303,16 +348,23 @@ def main() -> int:
 
     costs, conflicts = load_cost()
     coverage = load_json(COVERAGE)["records"]
+    link_cost = load_link_cost(ROOT / "results" / "escalation_link_cost.json")
+    cdad_costs = load_cdad_cost(CDAD_COST)
 
     points = []
     coverage_orphans = []
     for record in coverage:
         digest = record["profile_hash_hex"]
         cost = costs.get(digest)
-        if cost is None:
+        adaptive_raw = (
+            adaptive_cdad_cost(record, cdad_costs, link_cost)
+            if record.get("family") == "cdad"
+            else None
+        )
+        if cost is None and adaptive_raw is None:
             coverage_orphans.append(record)
             continue
-        raw = cost["raw_step_constraints"]
+        raw = adaptive_raw if adaptive_raw is not None else cost["raw_step_constraints"]
         correct = record["correct_definite"]
         points.append(
             {
@@ -330,7 +382,10 @@ def main() -> int:
                 "threshold": record["threshold"],
                 "parameters": record["parameters"],
                 "cost": raw,
-                "total_constraints": cost["total_constraints"],
+                "total_constraints": None if cost is None else cost["total_constraints"],
+                "cost_source": "cdad-measured-attempts-and-links"
+                if adaptive_raw is not None
+                else "nova-sweep",
                 "opportunities": record["opportunities"],
                 "definite": record["definite"],
                 "abstained": record["abstained"],
@@ -339,17 +394,23 @@ def main() -> int:
                 "availability": record["availability"],
                 "unsound_rate": record["unsound_rate"] or 0.0,
                 "definitive_horizon": record["definitive_horizon"],
-                "cost_per_correct": raw / correct if correct else None,
+                # `raw` é custo médio por oportunidade. Recuperar o custo total
+                # antes de dividir pelos acertos preserva a unidade
+                # constraints/decisão definitiva correta.
+                "cost_per_correct": raw * record["opportunities"] / correct
+                if correct
+                else None,
             }
         )
 
     joined_hashes = {point["profile_hash_hex"] for point in points}
     cost_orphans = sorted(set(costs) - joined_hashes)
 
-    link_cost = load_link_cost(ROOT / "results" / "escalation_link_cost.json")
     for point in points:
-        point["expected_cost_with_escalation"] = escalation_cost(
-            costs, coverage, point, link_cost
+        point["expected_cost_with_escalation"] = (
+            point["cost"]
+            if point["family"] == "cdad"
+            else escalation_cost(costs, coverage, point, link_cost)
         )
 
     join_rate = len(points) / len(coverage) if coverage else 0.0

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600">
+<rect x="0" y="0" width="960" height="600" fill="#ffffff"/>
+<style>text{font-family:Inter,Arial,sans-serif;fill:#172033}.axis{stroke:#526071;stroke-width:1}.grid{stroke:#d9e0e8;stroke-width:1}.label{font-size:13px}.title{font-size:20px;font-weight:600}.legend{font-size:12px}</style>
+<text x="480.0" y="28" text-anchor="middle" class="title">Maximum error vs precision</text>
+<line x1="92.00" y1="48" x2="92.00" y2="522" class="grid"/>
+<text x="92.00" y="544" text-anchor="middle" class="label">7.46</text>
+<line x1="260.00" y1="48" x2="260.00" y2="522" class="grid"/>
+<text x="260.00" y="544" text-anchor="middle" class="label">7.68</text>
+<line x1="428.00" y1="48" x2="428.00" y2="522" class="grid"/>
+<text x="428.00" y="544" text-anchor="middle" class="label">7.89</text>
+<line x1="596.00" y1="48" x2="596.00" y2="522" class="grid"/>
+<text x="596.00" y="544" text-anchor="middle" class="label">8.11</text>
+<line x1="764.00" y1="48" x2="764.00" y2="522" class="grid"/>
+<text x="764.00" y="544" text-anchor="middle" class="label">8.32</text>
+<line x1="932.00" y1="48" x2="932.00" y2="522" class="grid"/>
+<text x="932.00" y="544" text-anchor="middle" class="label">8.54</text>
+<line x1="92" y1="522.00" x2="932" y2="522.00" class="grid"/>
+<text x="80" y="526.00" text-anchor="end" class="label">1e-2</text>
+<line x1="92" y1="427.20" x2="932" y2="427.20" class="grid"/>
+<text x="80" y="431.20" text-anchor="end" class="label">1e-2</text>
+<line x1="92" y1="332.40" x2="932" y2="332.40" class="grid"/>
+<text x="80" y="336.40" text-anchor="end" class="label">1e-1</text>
+<line x1="92" y1="237.60" x2="932" y2="237.60" class="grid"/>
+<text x="80" y="241.60" text-anchor="end" class="label">1e-1</text>
+<line x1="92" y1="142.80" x2="932" y2="142.80" class="grid"/>
+<text x="80" y="146.80" text-anchor="end" class="label">1e-1</text>
+<line x1="92" y1="48.00" x2="932" y2="48.00" class="grid"/>
+<text x="80" y="52.00" text-anchor="end" class="label">1e-1</text>
+<line x1="92" y1="522" x2="932" y2="522" class="axis"/>
+<line x1="92" y1="48" x2="92" y2="522" class="axis"/>
+<text x="512.0" y="576" text-anchor="middle" class="label">fractional bits</text>
+<text x="22" y="285.0" transform="rotate(-90 22 285.0)" text-anchor="middle" class="label">maximum absolute error</text>
+<circle cx="104" cy="42" r="3.4" fill="#2563eb"/>
+<text x="113" y="46" class="legend">taylor</text>
+<circle cx="512.00" cy="285.00" r="3.2" fill="#2563eb"><title>taylor | exp | floor: 8, 0.0542193</title></circle>
+</svg>

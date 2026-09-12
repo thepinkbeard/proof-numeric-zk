@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/numeric-approximations",
     "crates/numeric-core",
     "crates/numeric-reference",
     "crates/numeric-bench",

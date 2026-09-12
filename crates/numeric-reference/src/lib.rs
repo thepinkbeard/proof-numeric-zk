@@ -11,10 +11,19 @@ use rug::{
 use thiserror::Error;
 
 mod fp32;
+mod dynamic_interval;
+pub use dynamic_interval::directed_dynamic_trajectory;
+mod gauss_legendre;
+mod transcendental;
 
 pub use fp32::{
     restricted_logistic_step, restricted_stable_step, RestrictedFp32, RestrictedFp32Error,
     RestrictedFp32StableTrace, RestrictedFp32Trace,
+};
+pub use gauss_legendre::{gauss_legendre_nodes_weights, GaussLegendreError, GaussLegendreRule};
+pub use transcendental::{
+    evaluate_transcendental, float_to_big_rational, resolve_transcendental_decision, ReferenceEnclosure,
+    TranscendentalReferenceError,
 };
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]

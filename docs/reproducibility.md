@@ -121,3 +121,76 @@ Os JSONs registram constraints brutas, circuito Nova aumentado, estado, setup,
 folds, verificação, compressão, prova serializada e pico RSS. Tempos obtidos
 com processos concorrentes não devem ser comparados; repita cada perfil
 isoladamente e com aquecimento para uma tabela temporal publicável.
+
+## Funções não polinomiais
+
+Execução integral da matriz científica:
+
+```bash
+bash scripts/run_non_polynomial_experiments.sh \
+  results/non_polynomial_run_20260901
+```
+
+Execução reduzida para validar ambiente e formatos de saída:
+
+```bash
+cargo run --release -p experiment-runner --bin function-eval -- \
+  --matrix experiments/non_polynomial_v1.json \
+  --output-dir results/non_polynomial_smoke_20260901 \
+  --seed 20260901 \
+  --grid-points 3 \
+  --random-samples 1 \
+  --timing-repetitions 1 \
+  --max-configurations 11
+```
+
+Faixa separada de compatibilidade com os parâmetros de sigmoid do artefato de
+Sridhar:
+
+```bash
+cargo run --release -p experiment-runner --bin function-eval -- \
+  --matrix experiments/sridhar_artifact_compat_v1.json \
+  --output-dir results/sridhar_artifact_compat_20260901 \
+  --seed 20260901
+```
+
+Cada comando recusa um diretório já existente. O manifest registra seed, hashes
+da matriz, inputs, perfis, `Cargo.lock` e diff Git, versões, plataforma e as
+precisões MPFR. `raw.jsonl` e `raw.csv` têm uma linha por amostra e threshold;
+`summary.json` evita contar o mesmo erro numérico uma vez por threshold;
+`timing.json` preserva as repetições intercaladas.
+
+O gerador de figuras usa somente a biblioteca padrão do Python e recusa
+sobrescrever seu diretório:
+
+```bash
+python3 scripts/plot_non_polynomial.py \
+  --input-dir results/non_polynomial_run_20260901 \
+  --output-dir results/non_polynomial_run_20260901/figures
+```
+
+O valor `binary32` é o arredondamento determinístico da referência MPFR, não uma
+alegação de que uma `libm` nativa específica implementa transcendentes IEEE de
+forma bit a bit. A referência matemática e a referência de aplicação permanecem
+campos distintos.
+# Auditoria composicional CDAD — resultados novos
+
+Executar a partir da raiz, escolhendo diretórios de saída inexistentes:
+
+```bash
+cargo test --workspace --locked
+cargo run --locked -p experiment-runner --bin contract-audit -- --output-dir results/cdad-audit-NOVO
+cargo run --locked -p experiment-runner --bin function-eval -- --output-dir results/functions-audit-NOVO --max-configurations 1 --grid-points 3 --random-samples 1 --timing-repetitions 0
+```
+
+O segundo comando é um smoke test off-circuit, não a campanha de 30 rodadas.
+O manifesto preserva contratos, entradas, hashes de fontes (inclusive untracked),
+protocolo, lockfile e ambiente. Tempos não são deterministicamente reproduzíveis;
+certificados e decisões devem ser. Em `function-eval` esquema 2, referência
+inconclusiva e flip desconhecido são valores ausentes, não `false`. Gráficos de
+flip excluem referências inconclusivas do denominador.
+
+O timing histórico do avaliador inclui preparação de coeficientes polinomiais
+por chamada, enquanto GL possui preparação separada. Ele mede esse avaliador,
+não um kernel homogêneo nem a campanha competitiva. Reorganizar e congelar setup
+e geração de witness antes de qualquer alegação comparativa de desempenho.

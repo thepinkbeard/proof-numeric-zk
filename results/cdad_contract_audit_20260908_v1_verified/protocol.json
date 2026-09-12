@@ -1,0 +1,99 @@
+{
+  "backend": {
+    "curve_cycle": "pallas-vesta",
+    "new_circuits_validated": false,
+    "nova": "0.73.0"
+  },
+  "ecef_exact_baseline": "integer-sum-of-three-squares-without-rescaling-products",
+  "fixed_baselines": [
+    16,
+    32,
+    48,
+    64
+  ],
+  "gates": [
+    "checked-universal-numeric-contract",
+    "canonical-vector-binding",
+    "same-backend-baselines",
+    "honest-and-malicious-witness-tests",
+    "held-out-policy-evaluation"
+  ],
+  "gl_orders": [
+    2,
+    4,
+    8,
+    16
+  ],
+  "main_workload": "ecef-squared-distance-on-canonical-coordinates",
+  "opportunities_per_seed_per_application": 1000,
+  "order_adaptation": "deferred-until-precision-evaluation-is-complete",
+  "performance_conclusion": "pending",
+  "policies": [
+    "fixed",
+    "sequential",
+    "margin-directed",
+    "preview-all"
+  ],
+  "precision_ladder": [
+    16,
+    32,
+    48,
+    64
+  ],
+  "privacy": {
+    "binding": "same-canonical-vector-and-contract",
+    "precision_is_public": true,
+    "vector_commitment_implemented": false
+  },
+  "protocol_id": "cdad-compositional-20260908-v1",
+  "reference_precision_ladder": [
+    256,
+    512,
+    1024,
+    2048,
+    4096
+  ],
+  "rounding": "nearest-ties-to-even",
+  "schema_version": 1,
+  "secondary_workload": {
+    "function": "mean-of-four-sigmoids",
+    "input_domain": [
+      "-1",
+      "1"
+    ],
+    "thresholds": [
+      "2/5",
+      "1/2",
+      "3/5"
+    ]
+  },
+  "seeds": [
+    20260908,
+    20260909,
+    20260910,
+    20260911,
+    20260912,
+    20260913,
+    20260914,
+    20260915,
+    20260916,
+    20260917
+  ],
+  "stage": "audit-and-preregistration",
+  "success": {
+    "equal_certified_coverage_required": true,
+    "incorrect_certified_decisions_allowed": 0,
+    "minimum_full_time_reduction": "1/10",
+    "paired_confidence": "95/100"
+  },
+  "timing": {
+    "include_commitment": true,
+    "include_previews": true,
+    "include_proof": true,
+    "include_verification": true,
+    "include_witness": true,
+    "paired_interleaved_rounds": 30,
+    "setup": "separate"
+  },
+  "unresolved_reference": "record-inconclusive-never-assume-agreement"
+}

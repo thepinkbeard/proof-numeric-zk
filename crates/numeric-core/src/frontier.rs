@@ -10,6 +10,7 @@
 use crate::profile::{
     BoundMode, ExperimentProfile, ProfileError, ProfileFamily, RoundingId, Topology, WorkloadId,
 };
+use crate::{CommitmentPolicy, PrecisionPolicy};
 use num_rational::BigRational;
 use serde::{Deserialize, Serialize};
 
@@ -30,19 +31,25 @@ pub enum RepresentationId {
     CbdLipschitz,
     CbdLocalTaylor,
     CbdSequentialLocalTaylor,
+    CdadFixed,
+    CdadSequential,
+    CdadMarginDirected,
     CfdSequential,
     CfdFused,
     Fp32Exact,
 }
 
 impl RepresentationId {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 12] = [
         Self::Standard,
         Self::Carry,
         Self::Compensated,
         Self::CbdLipschitz,
         Self::CbdLocalTaylor,
         Self::CbdSequentialLocalTaylor,
+        Self::CdadFixed,
+        Self::CdadSequential,
+        Self::CdadMarginDirected,
         Self::CfdSequential,
         Self::CfdFused,
         Self::Fp32Exact,
@@ -56,6 +63,9 @@ impl RepresentationId {
             Self::CbdLipschitz => "cbd_lipschitz",
             Self::CbdLocalTaylor => "cbd_local_taylor",
             Self::CbdSequentialLocalTaylor => "cbd_sequential_local_taylor",
+            Self::CdadFixed => "cdad_fixed",
+            Self::CdadSequential => "cdad_sequential",
+            Self::CdadMarginDirected => "cdad_margin_directed",
             Self::CfdSequential => "cfd_ieee_shaped_sequential",
             Self::CfdFused => "cfd_ieee_shaped_fused_checkpoint",
             Self::Fp32Exact => "fp32_positive_normal_exact",
@@ -72,6 +82,9 @@ impl RepresentationId {
             Self::CbdLipschitz | Self::CbdLocalTaylor | Self::CbdSequentialLocalTaylor => {
                 ProfileFamily::Cbd
             }
+            Self::CdadFixed | Self::CdadSequential | Self::CdadMarginDirected => {
+                ProfileFamily::Cdad
+            }
             Self::CfdSequential | Self::CfdFused => ProfileFamily::Cfd,
             Self::Fp32Exact => ProfileFamily::Fp32,
         }
@@ -82,6 +95,9 @@ impl RepresentationId {
             Self::Standard | Self::Carry | Self::Compensated | Self::Fp32Exact => BoundMode::None,
             Self::CbdLipschitz => BoundMode::GlobalLipschitz,
             Self::CbdLocalTaylor | Self::CbdSequentialLocalTaylor => BoundMode::LocalTaylor,
+            Self::CdadFixed | Self::CdadSequential | Self::CdadMarginDirected => {
+                BoundMode::DecisionAdaptive
+            }
             Self::CfdSequential | Self::CfdFused => BoundMode::Interval,
         }
     }
@@ -104,16 +120,32 @@ impl RepresentationId {
             Self::CbdLipschitz | Self::CbdLocalTaylor | Self::CbdSequentialLocalTaylor => {
                 Some(RoundingId::NearestTiesToEven)
             }
-            Self::CfdSequential | Self::CfdFused => {
-                Some(RoundingId::HonestRneCertifiedEnclosure)
+            Self::CdadFixed | Self::CdadSequential | Self::CdadMarginDirected => {
+                Some(RoundingId::NearestTiesToEven)
             }
+            Self::CfdSequential | Self::CfdFused => Some(RoundingId::HonestRneCertifiedEnclosure),
             Self::Fp32Exact => Some(RoundingId::NearestTiesToEven),
         }
     }
 
     /// Se a representação certifica um enclosure e portanto pode abster-se.
     pub fn is_certified(self) -> bool {
-        matches!(self.bound_mode(), BoundMode::GlobalLipschitz | BoundMode::LocalTaylor | BoundMode::Interval)
+        matches!(
+            self.bound_mode(),
+            BoundMode::GlobalLipschitz
+                | BoundMode::LocalTaylor
+                | BoundMode::DecisionAdaptive
+                | BoundMode::Interval
+        )
+    }
+
+    pub fn precision_policy(self) -> Option<PrecisionPolicy> {
+        match self {
+            Self::CdadFixed => Some(PrecisionPolicy::Fixed),
+            Self::CdadSequential => Some(PrecisionPolicy::Sequential),
+            Self::CdadMarginDirected => Some(PrecisionPolicy::MarginDirected),
+            _ => None,
+        }
     }
 }
 
@@ -248,6 +280,15 @@ impl FrontierPoint {
             builder = builder
                 .exponent_lanes(self.exponent_lanes.iter().copied())
                 .radius_bits(self.radius_bits);
+        }
+        if self.representation.family() == ProfileFamily::Cdad {
+            builder = builder.adaptive(
+                [16, 32, 48, 64],
+                self.representation
+                    .precision_policy()
+                    .expect("representação CDAD possui política"),
+                CommitmentPolicy::ExistingPoseidonLink,
+            );
         }
         builder.build()
     }

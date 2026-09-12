@@ -37,6 +37,10 @@ Este diretório é o ponto de retomada para pessoas e agentes automatizados.
 | [0021](0021-escalonamento-em-circuito.md) | 2026-07-30 | concluído | Vínculo de escalonamento em circuito, com custo medido |
 | [0022](0022-validacao-e-consolidacao.md) | 2026-07-30 | concluído | Berkeley SoftFloat e soundness por enumeração exaustiva |
 | [0023](0023-medicao-estatistica.md) | 2026-07-30 | concluído | Tempos com desenho pareado e intervalo de confiança |
+| [0024](0024-cdad-v1.md) | 2026-08-30 | v1 experimental | CDAD adaptativa, score R1CS, quatro workloads e Nova curto |
+| [0025](0025-semantica-numerica-funcoes.md) | 2026-09-01 | v1 off-circuit concluída | Numeric contract, exp/sigmoid, Taylor, Padé, Gauss-Legendre e decisão |
+| [0026](0026-cdad-contract-audit.md) | 2026-09-08 | auditoria off-circuit | Checker composicional, quatro políticas, referência dirigida e gates competitivos |
+| [0027](0027-qualification.md) | 2026-09-11 | pacote dinâmico | Matriz completa, prova vinculada pública, gráficos e campanha reproduzível |
 
 O capítulo consolidado está em
 [`../chapter-certified-frontier.md`](../chapter-certified-frontier.md).

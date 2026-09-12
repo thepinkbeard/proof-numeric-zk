@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "profile_id": "mpfr-256-exp-reference",
+  "profile_version": 1,
+  "representation": {
+    "kind": "mpfr-reference",
+    "signed": true,
+    "integer_bits": 16,
+    "fractional_bits": 256,
+    "scale_power": 256
+  },
+  "operations": {
+    "rounding": "nearest-ties-to-even",
+    "rescaling": "not-applicable",
+    "division_rounding": "nearest-ties-to-even",
+    "overflow": "reject",
+    "underflow": "quantize-to-grid",
+    "exceptional_values": "reject-non-finite"
+  },
+  "valid_domain": {
+    "minimum": { "numerator": "-1", "denominator": "1" },
+    "maximum": { "numerator": "1", "denominator": "1" },
+    "minimum_inclusive": true,
+    "maximum_inclusive": true
+  },
+  "approximation": {
+    "function": "exp",
+    "method": "none",
+    "method_version": 1,
+    "order": 0,
+    "expansion_center": { "numerator": "0", "denominator": "1" },
+    "evaluation_form": "mpfr-directed-rounding-enclosure",
+    "parameters": {},
+    "coefficient_or_node_source": "mpfr"
+  },
+  "error_contract": {
+    "quantization": {
+      "rule": { "kind": "absolute", "value": { "numerator": "0", "denominator": "1" } },
+      "evidence": "analytical",
+      "provenance": "repository-derived",
+      "citation": "Declared MPFR reference semantics"
+    },
+    "approximation": {
+      "rule": { "kind": "absolute", "value": { "numerator": "0", "denominator": "1" } },
+      "evidence": "analytical",
+      "provenance": "repository-derived",
+      "citation": "Declared MPFR reference semantics"
+    },
+    "verification_slack": {
+      "rule": { "kind": "absolute", "value": { "numerator": "0", "denominator": "1" } },
+      "evidence": "analytical",
+      "provenance": "repository-derived",
+      "citation": "No verification relation in the reference"
+    },
+    "accumulated_error": {
+      "rule": { "kind": "absolute", "value": { "numerator": "0", "denominator": "1" } },
+      "evidence": "analytical",
+      "provenance": "repository-derived",
+      "citation": "Semantics are exact relative to the declared MPFR profile"
+    },
+    "composition_rule": "interval-propagation"
+  },
+  "provenance": [
+    {
+      "source_kind": "repository-derived",
+      "citation": "MPFR via rug with directed rounding",
+      "locator": "numeric-reference::transcendental",
+      "note": "High-precision mathematical reference, distinct from binary32"
+    }
+  ]
+}

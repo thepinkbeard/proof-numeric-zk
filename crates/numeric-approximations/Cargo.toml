@@ -1,0 +1,16 @@
+[package]
+name = "numeric-approximations"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+num-bigint.workspace = true
+num-rational.workspace = true
+num-traits.workspace = true
+numeric-core = { path = "../numeric-core" }
+numeric-reference = { path = "../numeric-reference" }
+rug.workspace = true
+serde.workspace = true
+thiserror.workspace = true

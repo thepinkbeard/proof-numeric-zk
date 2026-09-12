@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "matrix_id": "sridhar-artifact-sigmoid-compat-v1",
+  "reference_precision_bits": 256,
+  "validation_precision_bits": 512,
+  "functions": [
+    {
+      "function": "sigmoid",
+      "domain": {
+        "minimum": { "numerator": "0", "denominator": "1" },
+        "maximum": { "numerator": "1", "denominator": "1" },
+        "minimum_inclusive": true,
+        "maximum_inclusive": true
+      },
+      "thresholds": [
+        { "numerator": "1", "denominator": "2" },
+        { "numerator": "3", "denominator": "5" },
+        { "numerator": "7", "denominator": "10" }
+      ]
+    }
+  ],
+  "formats": [
+    { "label": "artifact-f16", "integer_bits": 120, "fractional_bits": 16 },
+    { "label": "artifact-f32", "integer_bits": 120, "fractional_bits": 32 },
+    { "label": "artifact-f64", "integer_bits": 120, "fractional_bits": 64 },
+    { "label": "artifact-f120", "integer_bits": 120, "fractional_bits": 120 }
+  ],
+  "roundings": ["nearest-ties-to-even"],
+  "methods": [
+    { "method": "taylor", "orders": [5, 13, 33, 69] },
+    { "method": "pade-diagonal", "orders": [3, 5, 8, 13] },
+    { "method": "gauss-legendre-implicit", "orders": [4, 8, 16, 29] }
+  ],
+  "explicit_configurations": [
+    { "function": "sigmoid", "format_label": "artifact-f16", "rounding": "nearest-ties-to-even", "method": "taylor", "order": 5 },
+    { "function": "sigmoid", "format_label": "artifact-f32", "rounding": "nearest-ties-to-even", "method": "taylor", "order": 13 },
+    { "function": "sigmoid", "format_label": "artifact-f64", "rounding": "nearest-ties-to-even", "method": "taylor", "order": 33 },
+    { "function": "sigmoid", "format_label": "artifact-f120", "rounding": "nearest-ties-to-even", "method": "taylor", "order": 69 },
+    { "function": "sigmoid", "format_label": "artifact-f16", "rounding": "nearest-ties-to-even", "method": "pade-diagonal", "order": 3 },
+    { "function": "sigmoid", "format_label": "artifact-f32", "rounding": "nearest-ties-to-even", "method": "pade-diagonal", "order": 5 },
+    { "function": "sigmoid", "format_label": "artifact-f64", "rounding": "nearest-ties-to-even", "method": "pade-diagonal", "order": 8 },
+    { "function": "sigmoid", "format_label": "artifact-f120", "rounding": "nearest-ties-to-even", "method": "pade-diagonal", "order": 13 },
+    { "function": "sigmoid", "format_label": "artifact-f16", "rounding": "nearest-ties-to-even", "method": "gauss-legendre-implicit", "order": 4 },
+    { "function": "sigmoid", "format_label": "artifact-f32", "rounding": "nearest-ties-to-even", "method": "gauss-legendre-implicit", "order": 8 },
+    { "function": "sigmoid", "format_label": "artifact-f64", "rounding": "nearest-ties-to-even", "method": "gauss-legendre-implicit", "order": 16 },
+    { "function": "sigmoid", "format_label": "artifact-f120", "rounding": "nearest-ties-to-even", "method": "gauss-legendre-implicit", "order": 29 }
+  ],
+  "sampling": {
+    "grid_points": 1025,
+    "random_samples": 100,
+    "boundary_offset_bits": [16, 32, 64]
+  },
+  "timing": {
+    "repetitions": 30,
+    "batch_size": 100
+  }
+}

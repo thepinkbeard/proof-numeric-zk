@@ -2,10 +2,11 @@ use ff::Field;
 use nova_circuit::{
     circuit_decision, common_threshold, half_threshold_numerator, CarryLogisticStepCircuit2,
     CbdLogisticStepCircuit, CbdRadiusBound, CbdSequentialLogisticStepCircuit,
-    CbdSequentialStepWitness, CbdStepWitness, CfdLogisticStepCircuit, CfdLogisticStepWitness,
-    CfdStableStepCircuit, CfdStableStepWitness, CfdTopology, CircuitRounding,
-    CompensatedLogisticStepCircuit, CompensatedStepWitness, LogisticStepCircuit,
-    ProductCarryWitness2, StepWitness,
+    CbdSequentialStepWitness, CbdStepWitness, CdadFixedLogisticStepCircuit, CdadLinearScoreCircuit,
+    CdadLinearScoreWitness, CfdLogisticStepCircuit, CfdLogisticStepWitness, CfdStableStepCircuit,
+    CfdStableStepWitness, CfdTopology, CircuitRounding, CompensatedLogisticStepCircuit,
+    CompensatedStepWitness, LogisticStepCircuit, ProductCarryWitness2, SignedCdadValue,
+    StepWitness,
 };
 use nova_snark::{
     frontend::{num::AllocatedNum, test_cs::TestConstraintSystem, ConstraintSystem},
@@ -57,12 +58,16 @@ fn synthesize(
     let input_numerator = if input_is_one {
         1_u128 << 32
     } else {
-        input_limbs.iter().fold(0_u128, |acc, limb| (acc << 16) + *limb as u128)
+        input_limbs
+            .iter()
+            .fold(0_u128, |acc, limb| (acc << 16) + *limb as u128)
     };
     let threshold_numerator = half_threshold_numerator(2);
     z.push(
         AllocatedNum::alloc(cs.namespace(|| "input_decision"), || {
-            Ok(Scalar::from(u64::from(input_numerator >= threshold_numerator)))
+            Ok(Scalar::from(u64::from(
+                input_numerator >= threshold_numerator,
+            )))
         })
         .unwrap(),
     );
@@ -74,6 +79,28 @@ fn synthesize(
         threshold_numerator,
     };
     circuit.synthesize(&mut cs, &z).unwrap();
+    cs
+}
+
+fn synthesize_cdad_score(
+    witness: CdadLinearScoreWitness,
+    selected_precision: u64,
+) -> TestConstraintSystem<Scalar> {
+    let mut cs = TestConstraintSystem::new();
+    let z = vec![
+        AllocatedNum::alloc(cs.namespace(|| "score_iteration"), || Ok(Scalar::ZERO)).unwrap(),
+        AllocatedNum::alloc(cs.namespace(|| "score_previous_decision"), || {
+            Ok(Scalar::from(2_u64))
+        })
+        .unwrap(),
+        AllocatedNum::alloc(cs.namespace(|| "score_selected_precision"), || {
+            Ok(Scalar::from(selected_precision))
+        })
+        .unwrap(),
+    ];
+    CdadLinearScoreCircuit { witness }
+        .synthesize(&mut cs, &z)
+        .unwrap();
     cs
 }
 
@@ -148,7 +175,9 @@ fn synthesize_carry(
             let numerator = if input_is_one {
                 1_u128 << 32
             } else {
-                input_limbs.iter().fold(0_u128, |acc, limb| (acc << 16) + *limb as u128)
+                input_limbs
+                    .iter()
+                    .fold(0_u128, |acc, limb| (acc << 16) + *limb as u128)
             };
             Ok(Scalar::from(u64::from(
                 numerator >= half_threshold_numerator(2),
@@ -202,6 +231,50 @@ fn synthesize_cbd(
         radius_bound: CbdRadiusBound::Global,
         threshold_numerator: half_threshold_numerator(2),
     };
+    circuit.synthesize(&mut cs, &z).unwrap();
+    cs
+}
+
+fn synthesize_cdad(selected_bits: u64) -> TestConstraintSystem<Scalar> {
+    let input = [0x1999, 0x999a];
+    let radius = 1_u128;
+    let witness = CbdStepWitness::compute_with_threshold(
+        input,
+        false,
+        radius,
+        37,
+        10,
+        CbdRadiusBound::LocalTaylor,
+        half_threshold_numerator(2),
+    );
+    let inner = CbdLogisticStepCircuit {
+        witness,
+        r_num: 37,
+        r_den: 10,
+        radius_bound: CbdRadiusBound::LocalTaylor,
+        threshold_numerator: half_threshold_numerator(2),
+    };
+    let circuit = CdadFixedLogisticStepCircuit::new(inner);
+    let mut cs = TestConstraintSystem::new();
+    let values = [
+        0_u64,
+        input[0],
+        input[1],
+        0,
+        radius as u64,
+        0,
+        selected_bits,
+    ];
+    let z = values
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            AllocatedNum::alloc(cs.namespace(|| format!("cdad_state_{index}")), || {
+                Ok(Scalar::from(*value))
+            })
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
     circuit.synthesize(&mut cs, &z).unwrap();
     cs
 }
@@ -307,7 +380,8 @@ fn synthesize_cfd_stable(
     witness: CfdStableStepWitness,
 ) -> TestConstraintSystem<Scalar> {
     let mut cs = TestConstraintSystem::new();
-    let threshold_common = common_threshold(&profile, &BigRational::from_integer(1.into())).unwrap();
+    let threshold_common =
+        common_threshold(&profile, &BigRational::from_integer(1.into())).unwrap();
     let decision = circuit_decision(&profile, input, threshold_common).unwrap();
     let values = [
         0_u64,
@@ -612,6 +686,18 @@ fn accepts_cbd_fused_transition() {
     let witness = CbdStepWitness::compute(input, false, 1, 37, 10);
     let cs = synthesize_cbd(input, false, 1, witness);
     assert!(cs.is_satisfied(), "{:?}", cs.which_is_unsatisfied());
+}
+
+#[test]
+fn accepts_cdad_fixed_precision_transition() {
+    let cs = synthesize_cdad(32);
+    assert!(cs.is_satisfied(), "{:?}", cs.which_is_unsatisfied());
+}
+
+#[test]
+fn rejects_cdad_precision_outside_compiled_rung() {
+    let cs = synthesize_cdad(48);
+    assert!(!cs.is_satisfied());
 }
 
 #[test]
@@ -932,5 +1018,78 @@ fn accepts_stable_cfd_transition_and_rejects_tampering() {
     let mut tampered = CfdStableStepWitness::compute(&profile, &input, 1, 2, 3, 4).unwrap();
     tampered.output.significand += 50_000;
     let cs = synthesize_cfd_stable(profile, &input, tampered);
+    assert!(!cs.is_satisfied());
+}
+
+fn score_witness() -> CdadLinearScoreWitness {
+    score_witness_at(16)
+}
+
+fn score_witness_at(bits: usize) -> CdadLinearScoreWitness {
+    let scale = 1_u128 << bits;
+    CdadLinearScoreWitness::compute(
+        bits,
+        SignedCdadValue {
+            negative: false,
+            magnitude: scale / 10,
+            radius: 1,
+        },
+        vec![(
+            SignedCdadValue {
+                negative: false,
+                magnitude: scale / 2,
+                radius: 1,
+            },
+            SignedCdadValue {
+                negative: false,
+                magnitude: scale / 2,
+                radius: 1,
+            },
+        )],
+        BigRational::new(1.into(), 5.into()),
+    )
+}
+
+#[test]
+fn accepts_cdad_signed_score_and_selected_precision() {
+    for bits in [16_u64, 32, 48, 64] {
+        let witness = score_witness_at(bits as usize);
+        assert_eq!(witness.decision, 1);
+        let cs = synthesize_cdad_score(witness, bits);
+        assert!(cs.is_satisfied(), "{:?}", cs.which_is_unsatisfied());
+    }
+}
+
+#[test]
+fn rejects_tampered_cdad_score_fields_and_precision() {
+    let original = score_witness();
+
+    let mut center = original.clone();
+    center.output_center_offset += 1;
+    assert!(!synthesize_cdad_score(center, 16).is_satisfied());
+
+    let mut radius = original.clone();
+    radius.output_radius += 1;
+    assert!(!synthesize_cdad_score(radius, 16).is_satisfied());
+
+    let mut decision = original.clone();
+    decision.decision = 0;
+    assert!(!synthesize_cdad_score(decision, 16).is_satisfied());
+
+    assert!(!synthesize_cdad_score(original, 32).is_satisfied());
+}
+
+#[test]
+fn rejects_noncanonical_negative_zero_in_cdad_score() {
+    let mut witness = score_witness();
+    witness.terms[0].0.magnitude = 0;
+    witness.terms[0].0.negative = true;
+    witness = CdadLinearScoreWitness::compute(
+        witness.fractional_bits,
+        witness.bias,
+        witness.terms,
+        witness.threshold,
+    );
+    let cs = synthesize_cdad_score(witness, 16);
     assert!(!cs.is_satisfied());
 }

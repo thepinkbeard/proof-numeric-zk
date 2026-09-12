@@ -1,0 +1,248 @@
+[
+  {
+    "commitment_bound": false,
+    "constraints": null,
+    "decision": "Indeterminate",
+    "evaluations": [
+      {
+        "decision": "Indeterminate",
+        "elapsed_ns": 575083,
+        "precision_bits": 16,
+        "selected": true
+      }
+    ],
+    "lower": "-1/16384",
+    "policy": "fixed",
+    "proof_time_ns": null,
+    "reference_lower": "-1099511627777/1208925819614629174706176",
+    "reference_upper": "-1099511627777/1208925819614629174706176",
+    "selected_precision": 16,
+    "threshold": "0",
+    "total_selection_ns": 580334,
+    "upper": "1/16384",
+    "verify_time_ns": null,
+    "workload": "ecef-boundary-control"
+  },
+  {
+    "commitment_bound": false,
+    "constraints": null,
+    "decision": "False",
+    "evaluations": [
+      {
+        "decision": "False",
+        "elapsed_ns": 929548167,
+        "precision_bits": 16,
+        "selected": true
+      }
+    ],
+    "lower": "136737/262144",
+    "policy": "fixed",
+    "proof_time_ns": null,
+    "reference_lower": "55961218029304208443161333317533487047273060537920833371385854969315420049243543333111966967890471792710227586805833188475466850946018510885019451867526397/107262463439540776796592199985646769019834926564739147021788491549774112240588375814414994385335227421520254865491888406830031062495572559571469192048672768",
+    "reference_upper": "27980609014652104221580666658766743523636530268960416685692927484657710024621771666555983483945235896355113793402916594237733425473009255442509725933763205/53631231719770388398296099992823384509917463282369573510894245774887056120294187907207497192667613710760127432745944203415015531247786279785734596024336384",
+    "selected_precision": 16,
+    "threshold": "3/5",
+    "total_selection_ns": 929557833,
+    "upper": "136793/262144",
+    "verify_time_ns": null,
+    "workload": "sigmoid-average-control"
+  },
+  {
+    "commitment_bound": false,
+    "constraints": null,
+    "decision": "False",
+    "evaluations": [
+      {
+        "decision": "Indeterminate",
+        "elapsed_ns": 572125,
+        "precision_bits": 16,
+        "selected": false
+      },
+      {
+        "decision": "Indeterminate",
+        "elapsed_ns": 662875,
+        "precision_bits": 32,
+        "selected": false
+      },
+      {
+        "decision": "False",
+        "elapsed_ns": 600875,
+        "precision_bits": 48,
+        "selected": true
+      }
+    ],
+    "lower": "-65/70368744177664",
+    "policy": "sequential",
+    "proof_time_ns": null,
+    "reference_lower": "-1099511627777/1208925819614629174706176",
+    "reference_upper": "-1099511627777/1208925819614629174706176",
+    "selected_precision": 48,
+    "threshold": "0",
+    "total_selection_ns": 1841250,
+    "upper": "-63/70368744177664",
+    "verify_time_ns": null,
+    "workload": "ecef-boundary-control"
+  },
+  {
+    "commitment_bound": false,
+    "constraints": null,
+    "decision": "False",
+    "evaluations": [
+      {
+        "decision": "False",
+        "elapsed_ns": 929300000,
+        "precision_bits": 16,
+        "selected": true
+      }
+    ],
+    "lower": "136737/262144",
+    "policy": "sequential",
+    "proof_time_ns": null,
+    "reference_lower": "55961218029304208443161333317533487047273060537920833371385854969315420049243543333111966967890471792710227586805833188475466850946018510885019451867526397/107262463439540776796592199985646769019834926564739147021788491549774112240588375814414994385335227421520254865491888406830031062495572559571469192048672768",
+    "reference_upper": "27980609014652104221580666658766743523636530268960416685692927484657710024621771666555983483945235896355113793402916594237733425473009255442509725933763205/53631231719770388398296099992823384509917463282369573510894245774887056120294187907207497192667613710760127432745944203415015531247786279785734596024336384",
+    "selected_precision": 16,
+    "threshold": "3/5",
+    "total_selection_ns": 929310625,
+    "upper": "136793/262144",
+    "verify_time_ns": null,
+    "workload": "sigmoid-average-control"
+  },
+  {
+    "commitment_bound": false,
+    "constraints": null,
+    "decision": "False",
+    "evaluations": [
+      {
+        "decision": "Indeterminate",
+        "elapsed_ns": 578458,
+        "precision_bits": 16,
+        "selected": false
+      },
+      {
+        "decision": "False",
+        "elapsed_ns": 740083,
+        "precision_bits": 64,
+        "selected": true
+      }
+    ],
+    "lower": "-4194305/4611686018427387904",
+    "policy": "margin-directed",
+    "proof_time_ns": null,
+    "reference_lower": "-1099511627777/1208925819614629174706176",
+    "reference_upper": "-1099511627777/1208925819614629174706176",
+    "selected_precision": 64,
+    "threshold": "0",
+    "total_selection_ns": 1335875,
+    "upper": "-4194303/4611686018427387904",
+    "verify_time_ns": null,
+    "workload": "ecef-boundary-control"
+  },
+  {
+    "commitment_bound": false,
+    "constraints": null,
+    "decision": "False",
+    "evaluations": [
+      {
+        "decision": "False",
+        "elapsed_ns": 928553708,
+        "precision_bits": 16,
+        "selected": true
+      }
+    ],
+    "lower": "136737/262144",
+    "policy": "margin-directed",
+    "proof_time_ns": null,
+    "reference_lower": "55961218029304208443161333317533487047273060537920833371385854969315420049243543333111966967890471792710227586805833188475466850946018510885019451867526397/107262463439540776796592199985646769019834926564739147021788491549774112240588375814414994385335227421520254865491888406830031062495572559571469192048672768",
+    "reference_upper": "27980609014652104221580666658766743523636530268960416685692927484657710024621771666555983483945235896355113793402916594237733425473009255442509725933763205/53631231719770388398296099992823384509917463282369573510894245774887056120294187907207497192667613710760127432745944203415015531247786279785734596024336384",
+    "selected_precision": 16,
+    "threshold": "3/5",
+    "total_selection_ns": 928563083,
+    "upper": "136793/262144",
+    "verify_time_ns": null,
+    "workload": "sigmoid-average-control"
+  },
+  {
+    "commitment_bound": false,
+    "constraints": null,
+    "decision": "False",
+    "evaluations": [
+      {
+        "decision": "Indeterminate",
+        "elapsed_ns": 578958,
+        "precision_bits": 16,
+        "selected": false
+      },
+      {
+        "decision": "Indeterminate",
+        "elapsed_ns": 667458,
+        "precision_bits": 32,
+        "selected": false
+      },
+      {
+        "decision": "False",
+        "elapsed_ns": 599500,
+        "precision_bits": 48,
+        "selected": true
+      },
+      {
+        "decision": "False",
+        "elapsed_ns": 736583,
+        "precision_bits": 64,
+        "selected": false
+      }
+    ],
+    "lower": "-65/70368744177664",
+    "policy": "preview-all",
+    "proof_time_ns": null,
+    "reference_lower": "-1099511627777/1208925819614629174706176",
+    "reference_upper": "-1099511627777/1208925819614629174706176",
+    "selected_precision": 48,
+    "threshold": "0",
+    "total_selection_ns": 2590625,
+    "upper": "-63/70368744177664",
+    "verify_time_ns": null,
+    "workload": "ecef-boundary-control"
+  },
+  {
+    "commitment_bound": false,
+    "constraints": null,
+    "decision": "False",
+    "evaluations": [
+      {
+        "decision": "False",
+        "elapsed_ns": 929358000,
+        "precision_bits": 16,
+        "selected": true
+      },
+      {
+        "decision": "False",
+        "elapsed_ns": 5397292667,
+        "precision_bits": 32,
+        "selected": false
+      },
+      {
+        "decision": "False",
+        "elapsed_ns": 20288992792,
+        "precision_bits": 48,
+        "selected": false
+      },
+      {
+        "decision": "False",
+        "elapsed_ns": 53487383667,
+        "precision_bits": 64,
+        "selected": false
+      }
+    ],
+    "lower": "136737/262144",
+    "policy": "preview-all",
+    "proof_time_ns": null,
+    "reference_lower": "55961218029304208443161333317533487047273060537920833371385854969315420049243543333111966967890471792710227586805833188475466850946018510885019451867526397/107262463439540776796592199985646769019834926564739147021788491549774112240588375814414994385335227421520254865491888406830031062495572559571469192048672768",
+    "reference_upper": "27980609014652104221580666658766743523636530268960416685692927484657710024621771666555983483945235896355113793402916594237733425473009255442509725933763205/53631231719770388398296099992823384509917463282369573510894245774887056120294187907207497192667613710760127432745944203415015531247786279785734596024336384",
+    "selected_precision": 16,
+    "threshold": "3/5",
+    "total_selection_ns": 80103070541,
+    "upper": "136793/262144",
+    "verify_time_ns": null,
+    "workload": "sigmoid-average-control"
+  }
+]

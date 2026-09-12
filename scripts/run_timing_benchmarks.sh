@@ -24,7 +24,7 @@ steps="${STEPS:-10}"
 output_dir="results/timing"
 binary="${CARGO_TARGET_DIR:-target}/release/nova-circuit"
 
-representations=(cbd cbd-sequential cfd fp32 standard)
+representations=(cdad cbd cbd-sequential cfd fp32 standard)
 
 cargo build --release -p nova-circuit
 mkdir -p "$output_dir"
@@ -38,6 +38,8 @@ run_one() {
   # para todas, que é o que torna a comparação homogênea.
   if [[ "$representation" == "cfd" ]]; then
     args+=(--k 1 --precision 24 "--exponent-lanes=-4:0")
+  elif [[ "$representation" == "cdad" ]]; then
+    args+=(--k 2 --precision 32)
   else
     args+=(--k 2)
   fi

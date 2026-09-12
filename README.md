@@ -3,6 +3,30 @@
 Experimento reproduzível sobre representações fracionárias em limbs para
 computação iterativa verificável.
 
+## Pacote de qualificação
+
+O [relatório para o orientador](docs/qualification-results.md) sintetiza a evidência e seus limites.
+O [guia de qualificação](docs/qualification.md) reúne a matriz dinâmica,
+provas comprimidas verificáveis em processo separado e gráficos Gnuplot PDF/SVG.
+Para uma entrega nova, sem sobrescrever resultados:
+
+```bash
+bash scripts/run_qualification.sh results/qualificacao-NOVO quick
+```
+
+Troque `quick` por `full` para a matriz completa e 30 rodadas no cenário de
+timing predefinido. A contribuição avaliada é a preservação justificável da
+decisão, com cobertura e custo explícitos. As entradas são públicas; o pacote
+não reivindica privacidade nem Nova heterogêneo. Experimentos antigos permanecem
+disponíveis, mas os scripts históricos de timing não devem ser usados para
+esta campanha, pois reutilizam diretórios de saída.
+
+Princípio central: **representation alone does not determine semantic
+fidelity**. Para os novos experimentos, a semântica numérica é a composição
+explícita de representação, operações, aproximação e contrato de erro. A
+validade criptográfica continua separada da fidelidade numérica e da decisão da
+aplicação.
+
 O projeto separa deliberadamente:
 
 1. referência matemática exata;
@@ -19,6 +43,10 @@ cargo run --release -p experiment-runner -- --help
 cargo run --release -p nova-circuit -- --help
 cargo run --release -p nova-circuit -- --steps 10 --k 2 \
   --rounding nearest-even --representation fp32 --compress
+
+# Funções não polinomiais; o diretório de saída deve ser novo
+bash scripts/run_non_polynomial_experiments.sh \
+  results/non_polynomial_run_20260901
 ```
 
 Dependências são fixadas em `Cargo.lock`. A integração criptográfica usa
@@ -34,6 +62,9 @@ benchmarks homogêneos.
 - [Diário de progresso e ponto de retomada](docs/progress/README.md)
 - [Último avanço: Certified Floating Dyadic](docs/progress/0016-certified-floating-dyadic.md)
 - [Especificação CFD](docs/cfd-mathematical-specification.md)
+- [Especificação CDAD](docs/cdad-mathematical-specification.md)
+- [Protocolo experimental CDAD](docs/cdad-protocol.md)
+- [Semântica numérica e funções não polinomiais](docs/numeric-semantics-non-polynomial.md)
 - [Relatório](docs/report.md)
 - [Especificação matemática](docs/mathematical-specification.md)
 - [Bounds no corpo finito](docs/finite-field-bounds.md)
@@ -76,6 +107,50 @@ afim 846, contra 1.721 e 1.418 dos respectivos FP32 exatos. A avaliação até
 1.000 passos não encontrou decisões definitivas incorretas, mas expôs perda
 rápida de cobertura nos regimes caóticos; por isso o resultado científico é
 registrado como go parcial, não como dominância geral.
+
+A CDAD v1 acrescenta uma escada pública de precisão e três políticas de
+seleção (`fixed`, `sequential` e `margin-directed`). O controlador pode saltar
+provas intermediárias após pré-avaliações certificadas locais, mas toda decisão
+continua vindo do enclosure CBD. A matriz off-circuit cobre os quatro workloads;
+o protótipo Nova fixo cobre 16/32/48/64 bits e contabiliza separadamente cada
+tentativa e vínculo. Um gadget homogêneo de produto interno assinado cobre os
+scores de Adult e ECEF nas quatro precisões, com range checks, nearest-even,
+propagação conservadora de raio e decisão trivalorada. A adaptação heterogênea
+dentro de uma única instância Nova e o compromisso vetorial especializado
+permanecem fora da v1.
+
+## Funções não polinomiais e influência de Sridhar et al.
+
+O grupo **primitive/function fidelity** complementa os workloads iterativos sem
+substituí-los. Ele contém `exp` e `sigmoid`, referências MPFR dirigidas,
+fixed-point assinado e aproximações Taylor, Padé diagonal e Gauss-Legendre
+implícita. A matriz pública cobre Q8.8 até Q120.120, as duas semânticas de
+arredondamento encontradas no paper e no artefato, ordens configuráveis, erro
+decomposto, margens de decisão e contagens de operações.
+
+Sridhar et al. motivam diretamente a separação entre quantização honesta e
+slack de verificação, Padé, Gauss-Legendre com soma ponderada e a distinção
+entre largura e profundidade. Numeric profiles, taxonomia L1/L2/L3, estabilidade
+orientada à decisão, precisão adaptativa e futura composição com CDAD/Nova são
+extensões deste projeto, não contribuições atribuídas ao paper.
+
+O backend do paper é Noir/Barretenberg. Esta entrega é deliberadamente
+off-circuit: `estimated_constraints` e `actual_constraints` são exportados
+como ausentes, nunca estimados a partir de sistemas heterogêneos.
+
+### Contratos composicionais: marco de auditoria
+
+O [contrato composicional](docs/cdad-compositional-contract.md) acrescenta um
+checker racional independente para uma nova relação de sigmoid, propagação de
+enclosures e quatro políticas de seleção com todos os previews contabilizados.
+`contract-audit` exporta certificados e uma demonstração pequena de composição
+sigmoid e distância quadrática. Essa relação é extensão nossa, não reprodução
+do circuito de Sridhar. O runner de funções agora usa decisões MPFR dirigidas
+e resultados esquema 2; o slack GL histórico não é um bound total certificado.
+
+O [protocolo competitivo](docs/cdad-competitive-protocol.md) registra os gates
+antes da campanha. Compromisso vetorial, novos circuitos e vantagem de tempo
+completo **ainda não foram demonstrados**. Resultados anteriores são preservados.
 
 O desenvolvimento da representação CBD é documentado em registros cronológicos
 imutáveis. Para retomar o trabalho, leia primeiro o plano e depois o último

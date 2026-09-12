@@ -27,3 +27,7 @@ path = "src/main.rs"
 [[bin]]
 name = "escalation-cost"
 path = "src/bin/escalation_cost.rs"
+
+[[bin]]
+name = "cdad-cost"
+path = "src/bin/cdad_cost.rs"

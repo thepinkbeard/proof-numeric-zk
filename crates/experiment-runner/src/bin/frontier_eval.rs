@@ -25,8 +25,9 @@ use num_bigint::{BigInt, BigUint};
 use num_rational::BigRational;
 use num_traits::{One, ToPrimitive, Zero};
 use numeric_core::{
-    CertifiedDyadic, CertifiedFloat, CfdOperation, CfdProfile, Decision3, FrontierPoint,
-    NumericProfile, RepresentationId, RoundingId, WorkloadId, WorkloadSpec,
+    CertifiedDyadic, CertifiedFloat, CfdOperation, CfdProfile, Decision3, DecisionAdaptiveProfile,
+    FrontierPoint, NumericProfile, PrecisionPolicy, RepresentationId, RoundingId, WorkloadId,
+    WorkloadSpec,
 };
 use numeric_reference::{
     decimal_ratio, logistic_trajectory_high_precision, restricted_logistic_step,
@@ -40,7 +41,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Parser)]
 #[command(about = "Cobertura normalizada das representações da fronteira de Pareto")]
@@ -70,6 +71,55 @@ struct StateView {
     wide: bool,
 }
 
+/// Additive qualification interface; historical profiles and outputs unchanged.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct QualificationState {
+    pub lower: BigRational,
+    pub upper: BigRational,
+}
+
+pub fn qualification_trajectory(
+    family: &str, bits: usize, x0: &BigRational, parameter: &BigRational,
+    innovation: Option<&BigRational>, steps: usize,
+) -> Result<Vec<QualificationState>> {
+    if x0 < &BigRational::zero() || x0 > &BigRational::one() || parameter < &BigRational::zero()
+        || parameter > &BigRational::from_integer(4.into()) {
+        bail!("qualification input/parameter outside domain");
+    }
+    if let Some(c) = innovation {
+        if parameter >= &BigRational::one() || c < &BigRational::zero()
+            || c >= &(BigRational::from_integer(2.into()) * (BigRational::one()-parameter)) {
+            bail!("affine attractor outside [0,2)");
+        }
+    }
+    let (representation, rounding) = match family {
+        "fixed-truncate" => (RepresentationId::Standard, RoundingId::Truncate),
+        "fixed-rne" => (RepresentationId::Standard, RoundingId::NearestTiesToEven),
+        "cbd-local" => (RepresentationId::CbdLocalTaylor, RoundingId::NearestTiesToEven),
+        "cbd-sequential" if innovation.is_none() => (RepresentationId::CbdSequentialLocalTaylor, RoundingId::NearestTiesToEven),
+        "cfd" => (RepresentationId::CfdSequential, RoundingId::NearestTiesToEven),
+        "fp32" => (RepresentationId::Fp32Exact, RoundingId::NearestTiesToEven),
+        _ => bail!("unsupported qualification family {family}"),
+    };
+    if !([16, 32, 48, 64].contains(&bits) || bits == 24 && ["cfd", "fp32"].contains(&family)) {
+        bail!("unsupported precision");
+    }
+    let mut variant = Variant::plain(representation, bits, rounding);
+    if family == "cfd" {
+        variant.exponent_lanes = if innovation.is_some() { (-24..=1).collect() } else { (-16..=0).collect() };
+        variant.radius_bits = 16;
+    }
+    let trajectory = if let Some(c) = innovation {
+        affine_trajectory_for(&variant, x0, parameter, c, AffineParameters {
+            alpha_num: parameter.numer().to_u64().context("alpha numerator")?,
+            alpha_den: parameter.denom().to_u64().context("alpha denominator")?,
+            innovation_num: c.numer().to_u64().context("innovation numerator")?,
+            innovation_den: c.denom().to_u64().context("innovation denominator")?,
+        }, steps, &[])?
+    } else { trajectory_for(&variant, x0, parameter, steps, &[])? };
+    Ok(trajectory.states.into_iter().map(|s| QualificationState { lower:s.lower, upper:s.upper }).collect())
+}
+
 impl StateView {
     fn exact(value: BigRational) -> Self {
         Self {
@@ -80,7 +130,9 @@ impl StateView {
     }
 
     fn width(&self) -> f64 {
-        (&self.upper - &self.lower).to_f64().unwrap_or(f64::INFINITY)
+        (&self.upper - &self.lower)
+            .to_f64()
+            .unwrap_or(f64::INFINITY)
     }
 
     /// Regra de decisão do intervalo, idêntica à do gadget CBD: a decisão só é
@@ -147,12 +199,8 @@ fn logistic_reference(
     thresholds: &[BigRational],
 ) -> Result<Reference> {
     let precision_bits = (2 * steps + 128).max(256) as u32;
-    let trajectory = logistic_trajectory_high_precision(
-        x0,
-        r,
-        steps,
-        &HighPrecisionConfig { precision_bits },
-    )?;
+    let trajectory =
+        logistic_trajectory_high_precision(x0, r, steps, &HighPrecisionConfig { precision_bits })?;
     let intervals: Vec<(BigRational, BigRational)> = trajectory
         .iter()
         .map(|point| {
@@ -201,10 +249,7 @@ fn limb_numerator<const K: usize>(limbs: [u64; K], is_one: bool) -> u128 {
 }
 
 fn dyadic(numerator: u128, fractional_bits: usize) -> BigRational {
-    BigRational::new(
-        BigInt::from(numerator),
-        BigInt::one() << fractional_bits,
-    )
+    BigRational::new(BigInt::from(numerator), BigInt::one() << fractional_bits)
 }
 
 fn fixed_point_trajectory<const K: usize>(
@@ -377,7 +422,10 @@ fn cfd_logistic_profile(
     .context("perfil CFD inválido")
 }
 
-fn cfd_state(profile: &CfdProfile, value: &nova_circuit::CfdCircuitValue) -> Result<CertifiedFloat> {
+fn cfd_state(
+    profile: &CfdProfile,
+    value: &nova_circuit::CfdCircuitValue,
+) -> Result<CertifiedFloat> {
     CertifiedFloat::from_parts(
         profile.clone(),
         false,
@@ -404,14 +452,13 @@ fn cfd_trajectory(
     let common: Vec<u128> = thresholds
         .iter()
         .map(|threshold| {
-            common_threshold(profile, threshold).with_context(|| {
-                format!("limiar {threshold} fora da escala comum do perfil CFD")
-            })
+            common_threshold(profile, threshold)
+                .with_context(|| format!("limiar {threshold} fora da escala comum do perfil CFD"))
         })
         .collect::<Result<_>>()?;
 
-    let mut value = CertifiedFloat::from_exact(profile.clone(), x0)
-        .context("x0 não pertence ao perfil CFD")?;
+    let mut value =
+        CertifiedFloat::from_exact(profile.clone(), x0).context("x0 não pertence ao perfil CFD")?;
     let mut states = Vec::with_capacity(steps + 1);
     let mut decisions = vec![Vec::with_capacity(steps + 1); thresholds.len()];
     for index in 0..=steps {
@@ -424,9 +471,8 @@ fn cfd_trajectory(
             slot.push(circuit_decision(profile, &value, *threshold)?);
         }
         if index < steps {
-            let witness =
-                CfdLogisticStepWitness::compute(profile, &value, r_num, r_den, topology)
-                    .with_context(|| format!("testemunha CFD na iteração {index}"))?;
+            let witness = CfdLogisticStepWitness::compute(profile, &value, r_num, r_den, topology)
+                .with_context(|| format!("testemunha CFD na iteração {index}"))?;
             value = cfd_state(profile, &witness.output)?;
         }
     }
@@ -455,6 +501,67 @@ fn fp32_trajectory(
     }
     let decisions = decide_all(&states, thresholds);
     Ok(Trajectory { states, decisions })
+}
+
+fn cdad_logistic_trajectories(
+    x0: &BigRational,
+    r: &BigRational,
+    steps: usize,
+    thresholds: &[BigRational],
+    policy: PrecisionPolicy,
+) -> Result<Vec<(Trajectory, AdaptiveMetrics)>> {
+    let profile = DecisionAdaptiveProfile::new(
+        format!("cdad-logistic-{}", policy.tag()),
+        1,
+        vec![16, 32, 48, 64],
+        BigRational::zero(),
+        BigRational::one(),
+        thresholds.to_vec(),
+        policy,
+        numeric_core::CommitmentPolicy::ExistingPoseidonLink,
+    )
+    .context("perfil CDAD logístico")?;
+    let mut by_precision = BTreeMap::<usize, Vec<CertifiedDyadic>>::new();
+    for bits in profile.precision_ladder() {
+        let numeric = profile.numeric_profile(*bits)?;
+        let mut value = CertifiedDyadic::from_exact(numeric, x0)?;
+        let mut values = Vec::with_capacity(steps + 1);
+        for index in 0..=steps {
+            values.push(value.clone());
+            if index < steps {
+                value = value.logistic_step_local_bound(r)?;
+            }
+        }
+        by_precision.insert(*bits, values);
+    }
+
+    thresholds
+        .iter()
+        .map(|threshold| {
+            let mut states = Vec::with_capacity(steps + 1);
+            let mut decisions = Vec::with_capacity(steps + 1);
+            let mut metrics = AdaptiveMetrics::default();
+            for index in 0..=steps {
+                let adaptive = profile.evaluate(threshold, |numeric| {
+                    Ok(by_precision[&numeric.fractional_bits()][index].clone())
+                })?;
+                metrics.observe(&adaptive, profile.precision_ladder());
+                states.push(StateView {
+                    lower: adaptive.value.lower(),
+                    upper: adaptive.value.upper(),
+                    wide: false,
+                });
+                decisions.push(adaptive.decision);
+            }
+            Ok((
+                Trajectory {
+                    states,
+                    decisions: vec![decisions],
+                },
+                metrics,
+            ))
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -725,6 +832,68 @@ fn fp32_affine_trajectory(
     Ok(Trajectory { states, decisions })
 }
 
+fn cdad_affine_trajectories(
+    x0: &BigRational,
+    alpha: &BigRational,
+    innovation: &BigRational,
+    steps: usize,
+    thresholds: &[BigRational],
+    policy: PrecisionPolicy,
+) -> Result<Vec<(Trajectory, AdaptiveMetrics)>> {
+    let profile = DecisionAdaptiveProfile::new(
+        format!("cdad-affine-{}", policy.tag()),
+        1,
+        vec![16, 32, 48, 64],
+        BigRational::zero(),
+        BigRational::from_integer(2.into()),
+        thresholds.to_vec(),
+        policy,
+        numeric_core::CommitmentPolicy::ExistingPoseidonLink,
+    )
+    .context("perfil CDAD afim")?;
+    let mut by_precision = BTreeMap::<usize, Vec<CertifiedDyadic>>::new();
+    for bits in profile.precision_ladder() {
+        let numeric = profile.numeric_profile(*bits)?;
+        let addend = CertifiedDyadic::from_exact(numeric.clone(), innovation)?;
+        let mut value = CertifiedDyadic::from_exact(numeric, x0)?;
+        let mut values = Vec::with_capacity(steps + 1);
+        for index in 0..=steps {
+            values.push(value.clone());
+            if index < steps {
+                value = value.mul_public(alpha)?.add(&addend)?;
+            }
+        }
+        by_precision.insert(*bits, values);
+    }
+    thresholds
+        .iter()
+        .map(|threshold| {
+            let mut states = Vec::with_capacity(steps + 1);
+            let mut decisions = Vec::with_capacity(steps + 1);
+            let mut metrics = AdaptiveMetrics::default();
+            for index in 0..=steps {
+                let adaptive = profile.evaluate(threshold, |numeric| {
+                    Ok(by_precision[&numeric.fractional_bits()][index].clone())
+                })?;
+                metrics.observe(&adaptive, profile.precision_ladder());
+                states.push(StateView {
+                    lower: adaptive.value.lower(),
+                    upper: adaptive.value.upper(),
+                    wide: false,
+                });
+                decisions.push(adaptive.decision);
+            }
+            Ok((
+                Trajectory {
+                    states,
+                    decisions: vec![decisions],
+                },
+                metrics,
+            ))
+        })
+        .collect()
+}
+
 fn rational_to_f32(value: &BigRational, name: &str) -> Result<f32> {
     let converted = value
         .to_f32()
@@ -865,10 +1034,7 @@ fn logistic_variants() -> Vec<Variant> {
     }
     for precision_bits in [16, 24, 32] {
         for minimum_exponent in [-4_i16, -8, -16] {
-            for representation in [
-                RepresentationId::CfdSequential,
-                RepresentationId::CfdFused,
-            ] {
+            for representation in [RepresentationId::CfdSequential, RepresentationId::CfdFused] {
                 variants.push(Variant {
                     representation,
                     precision_bits,
@@ -884,6 +1050,17 @@ fn logistic_variants() -> Vec<Variant> {
         24,
         RoundingId::NearestTiesToEven,
     ));
+    for representation in [
+        RepresentationId::CdadFixed,
+        RepresentationId::CdadSequential,
+        RepresentationId::CdadMarginDirected,
+    ] {
+        variants.push(Variant::plain(
+            representation,
+            16,
+            RoundingId::NearestTiesToEven,
+        ));
+    }
     variants
 }
 
@@ -935,6 +1112,17 @@ fn affine_variants() -> Vec<Variant> {
         24,
         RoundingId::NearestTiesToEven,
     ));
+    for representation in [
+        RepresentationId::CdadFixed,
+        RepresentationId::CdadSequential,
+        RepresentationId::CdadMarginDirected,
+    ] {
+        variants.push(Variant::plain(
+            representation,
+            16,
+            RoundingId::NearestTiesToEven,
+        ));
+    }
     variants
 }
 
@@ -962,7 +1150,14 @@ fn affine_trajectory_for(
             )
         }
         RepresentationId::CbdLocalTaylor => {
-            by_limbs!(bits, affine_cbd_trajectory, x0, parameters, steps, thresholds)
+            by_limbs!(
+                bits,
+                affine_cbd_trajectory,
+                x0,
+                parameters,
+                steps,
+                thresholds
+            )
         }
         RepresentationId::CfdSequential => {
             let profile = cfd_affine_profile(
@@ -976,10 +1171,7 @@ fn affine_trajectory_for(
         RepresentationId::Fp32Exact => {
             fp32_affine_trajectory(x0, alpha, innovation, steps, thresholds)
         }
-        other => bail!(
-            "{} não tem etapa afim; veja affine_variants",
-            other.tag()
-        ),
+        other => bail!("{} não tem etapa afim; veja affine_variants", other.tag()),
     }
 }
 
@@ -1066,6 +1258,11 @@ fn trajectory_for(
             cfd_trajectory(&profile, x0, r_num, r_den, steps, topology, thresholds)
         }
         RepresentationId::Fp32Exact => fp32_trajectory(x0, r, steps, thresholds),
+        RepresentationId::CdadFixed
+        | RepresentationId::CdadSequential
+        | RepresentationId::CdadMarginDirected => {
+            bail!("CDAD usa o avaliador adaptativo por limiar")
+        }
     }
 }
 
@@ -1115,6 +1312,57 @@ struct CoverageRecord {
     enclosure_violations: usize,
     mean_interval_width: f64,
     maximum_interval_width: f64,
+    initial_precision_bits: Option<usize>,
+    mean_final_precision_bits: Option<f64>,
+    maximum_final_precision_bits: Option<usize>,
+    total_attempts: Option<usize>,
+    linked_retries: Option<usize>,
+    skipped_rungs: Option<usize>,
+    residual_abstentions: Option<usize>,
+    attempted_precision_histogram: Option<BTreeMap<usize, usize>>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct AdaptiveMetrics {
+    opportunities: usize,
+    final_precision_sum: usize,
+    maximum_final_precision: usize,
+    total_attempts: usize,
+    linked_retries: usize,
+    skipped_rungs: usize,
+    residual_abstentions: usize,
+    attempted_precision_histogram: BTreeMap<usize, usize>,
+}
+
+impl AdaptiveMetrics {
+    fn observe(&mut self, decision: &numeric_core::AdaptiveDecision, ladder: &[usize]) {
+        self.opportunities += 1;
+        let final_bits = decision.value.fractional_bits();
+        self.final_precision_sum += final_bits;
+        self.maximum_final_precision = self.maximum_final_precision.max(final_bits);
+        self.total_attempts += decision.attempts.len();
+        self.linked_retries += decision.attempts.len().saturating_sub(1);
+        self.residual_abstentions += usize::from(decision.decision == Decision3::Indeterminate);
+        let attempted_indices: Vec<usize> = decision
+            .attempts
+            .iter()
+            .filter_map(|attempt| {
+                ladder
+                    .iter()
+                    .position(|bits| *bits == attempt.attempted_bits)
+            })
+            .collect();
+        self.skipped_rungs += attempted_indices
+            .windows(2)
+            .map(|pair| pair[1].saturating_sub(pair[0] + 1))
+            .sum::<usize>();
+        for attempt in &decision.attempts {
+            *self
+                .attempted_precision_histogram
+                .entry(attempt.attempted_bits)
+                .or_default() += 1;
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -1135,6 +1383,7 @@ fn record(
     is_principal: bool,
     states: usize,
     counts: Counts,
+    adaptive: Option<&AdaptiveMetrics>,
 ) -> Result<CoverageRecord> {
     let point = FrontierPoint {
         representation: variant.representation,
@@ -1147,8 +1396,8 @@ fn record(
     };
     let profile = point.profile().context("perfil de experimento inválido")?;
     let correct_definite = counts.definite - counts.unsound_definite;
-    let availability = (counts.opportunities > 0)
-        .then(|| counts.definite as f64 / counts.opportunities as f64);
+    let availability =
+        (counts.opportunities > 0).then(|| counts.definite as f64 / counts.opportunities as f64);
     let unsound_rate =
         (counts.definite > 0).then(|| counts.unsound_definite as f64 / counts.definite as f64);
     let definitive_horizon = match counts.first_abstention {
@@ -1191,6 +1440,18 @@ fn record(
         enclosure_violations: counts.enclosure_violations,
         mean_interval_width: counts.width_sum / states as f64,
         maximum_interval_width: counts.maximum_width,
+        initial_precision_bits: adaptive.map(|_| 16),
+        mean_final_precision_bits: adaptive.and_then(|metrics| {
+            (metrics.opportunities > 0)
+                .then(|| metrics.final_precision_sum as f64 / metrics.opportunities as f64)
+        }),
+        maximum_final_precision_bits: adaptive.map(|metrics| metrics.maximum_final_precision),
+        total_attempts: adaptive.map(|metrics| metrics.total_attempts),
+        linked_retries: adaptive.map(|metrics| metrics.linked_retries),
+        skipped_rungs: adaptive.map(|metrics| metrics.skipped_rungs),
+        residual_abstentions: adaptive.map(|metrics| metrics.residual_abstentions),
+        attempted_precision_histogram: adaptive
+            .map(|metrics| metrics.attempted_precision_histogram.clone()),
     })
 }
 
@@ -1335,7 +1596,12 @@ fn decision_reference(cases: &[DecisionCase], thresholds: &[BigRational]) -> Ref
         .collect();
     let outcomes = thresholds
         .iter()
-        .map(|threshold| scores.iter().map(|score| Some(score >= threshold)).collect())
+        .map(|threshold| {
+            scores
+                .iter()
+                .map(|score| Some(score >= threshold))
+                .collect()
+        })
         .collect();
     Reference {
         intervals,
@@ -1378,8 +1644,8 @@ fn fixed_point_decision_states(
         .map(|case| {
             let mut accumulator = quantize_signed(&case.bias, bits, rounding);
             for (left, right) in &case.terms {
-                let product = quantize_signed(left, bits, rounding)
-                    * quantize_signed(right, bits, rounding);
+                let product =
+                    quantize_signed(left, bits, rounding) * quantize_signed(right, bits, rounding);
                 accumulator = quantize_signed(&(accumulator + product), bits, rounding);
             }
             StateView::exact(accumulator)
@@ -1434,6 +1700,47 @@ fn cbd_decision_states(
         })
         .collect::<Result<Vec<_>, numeric_core::CbdError>>()
         .context("pontuação CBD")
+}
+
+fn cbd_score(
+    case: &DecisionCase,
+    profile: &NumericProfile,
+) -> Result<CertifiedDyadic, numeric_core::CbdError> {
+    let bias = CertifiedDyadic::from_exact(profile.clone(), &case.bias)?;
+    let terms = case
+        .terms
+        .iter()
+        .map(|(left, right)| {
+            Ok((
+                CertifiedDyadic::from_exact(profile.clone(), left)?,
+                CertifiedDyadic::from_exact(profile.clone(), right)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, numeric_core::CbdError>>()?;
+    CertifiedDyadic::linear_score(&bias, &terms)
+}
+
+fn cdad_decision_states(
+    cases: &[DecisionCase],
+    threshold: &BigRational,
+    policy: PrecisionPolicy,
+) -> Result<(Vec<StateView>, AdaptiveMetrics)> {
+    let profile = DecisionAdaptiveProfile::signed_score(policy, vec![threshold.clone()])
+        .context("perfil CDAD assinado")?;
+    let mut metrics = AdaptiveMetrics::default();
+    let mut states = Vec::with_capacity(cases.len());
+    for case in cases {
+        let adaptive = profile
+            .evaluate(threshold, |numeric| cbd_score(case, numeric))
+            .context("pontuação adaptativa CDAD")?;
+        metrics.observe(&adaptive, profile.precision_ladder());
+        states.push(StateView {
+            lower: adaptive.value.lower(),
+            upper: adaptive.value.upper(),
+            wide: false,
+        });
+    }
+    Ok((states, metrics))
 }
 
 fn cfd_signed_profile(
@@ -1535,6 +1842,17 @@ fn decision_variants() -> Vec<Variant> {
         24,
         RoundingId::NearestTiesToEven,
     ));
+    for representation in [
+        RepresentationId::CdadFixed,
+        RepresentationId::CdadSequential,
+        RepresentationId::CdadMarginDirected,
+    ] {
+        variants.push(Variant::plain(
+            representation,
+            16,
+            RoundingId::NearestTiesToEven,
+        ));
+    }
     variants
 }
 
@@ -1542,15 +1860,30 @@ fn decision_states(
     variant: &Variant,
     cases: &[DecisionCase],
     thresholds: &[BigRational],
-) -> Result<Vec<StateView>> {
+    threshold: &BigRational,
+) -> Result<(Vec<StateView>, Option<AdaptiveMetrics>)> {
     match variant.representation {
-        RepresentationId::Standard => Ok(fixed_point_decision_states(
-            cases,
-            variant.precision_bits,
-            circuit_rounding(variant.rounding)?,
+        RepresentationId::Standard => Ok((
+            fixed_point_decision_states(
+                cases,
+                variant.precision_bits,
+                circuit_rounding(variant.rounding)?,
+            ),
+            None,
         )),
-        RepresentationId::CbdLocalTaylor => {
-            cbd_decision_states(cases, variant.precision_bits, thresholds)
+        RepresentationId::CbdLocalTaylor => Ok((
+            cbd_decision_states(cases, variant.precision_bits, thresholds)?,
+            None,
+        )),
+        RepresentationId::CdadFixed
+        | RepresentationId::CdadSequential
+        | RepresentationId::CdadMarginDirected => {
+            let policy = variant
+                .representation
+                .precision_policy()
+                .expect("representação CDAD possui política");
+            let (states, metrics) = cdad_decision_states(cases, threshold, policy)?;
+            Ok((states, Some(metrics)))
         }
         RepresentationId::CfdSequential => {
             let profile = cfd_signed_profile(
@@ -1559,9 +1892,9 @@ fn decision_states(
                 variant.radius_bits,
                 thresholds,
             )?;
-            cfd_decision_states(cases, &profile)
+            Ok((cfd_decision_states(cases, &profile)?, None))
         }
-        RepresentationId::Fp32Exact => fp32_decision_states(cases),
+        RepresentationId::Fp32Exact => Ok((fp32_decision_states(cases)?, None)),
         other => bail!("{} não avalia workloads de decisão", other.tag()),
     }
 }
@@ -1583,7 +1916,12 @@ fn sweep_decisions(
     // Corda ao quadrado: `(2 sin(θ/2))² = 2 − 2 cos θ`.
     let ecef_threshold = float_ratio(2.0 - 2.0 * threshold_angle.cos());
 
-    let workloads: Vec<(WorkloadId, &'static str, Vec<DecisionCase>, Vec<BigRational>)> = vec![
+    let workloads: Vec<(
+        WorkloadId,
+        &'static str,
+        Vec<DecisionCase>,
+        Vec<BigRational>,
+    )> = vec![
         (
             WorkloadId::AdultLogistic,
             "decisao_unica",
@@ -1602,22 +1940,26 @@ fn sweep_decisions(
         let reference = decision_reference(&cases, &thresholds);
         let spec = WorkloadSpec::signed_scoring(
             workload,
-            [("cases".to_string(), BigRational::from_integer(cases.len().into()))],
+            [(
+                "cases".to_string(),
+                BigRational::from_integer(cases.len().into()),
+            )],
         );
         for variant in variants {
-            let states = decision_states(variant, &cases, &thresholds).with_context(|| {
-                format!(
-                    "pontuação de {} p{} em {:?}",
-                    variant.representation.tag(),
-                    variant.precision_bits,
-                    workload
-                )
-            })?;
-            let decisions = decide_all(&states, &thresholds);
             for (index, threshold) in thresholds.iter().enumerate() {
+                let (states, adaptive) = decision_states(variant, &cases, &thresholds, threshold)
+                    .with_context(|| {
+                    format!(
+                        "pontuação de {} p{} em {:?}",
+                        variant.representation.tag(),
+                        variant.precision_bits,
+                        workload
+                    )
+                })?;
+                let decisions = decide_all(&states, std::slice::from_ref(threshold));
                 let counts = score(
                     &states,
-                    &decisions[index],
+                    &decisions[0],
                     &reference,
                     index,
                     variant.representation.is_certified(),
@@ -1630,6 +1972,7 @@ fn sweep_decisions(
                     true,
                     states.len(),
                     counts,
+                    adaptive.as_ref(),
                 )?);
             }
         }
@@ -1673,6 +2016,36 @@ fn sweep_logistic(
         let spec = WorkloadSpec::logistic_map(r.clone(), x0.clone());
         let regime = regime_of(&r);
         for variant in variants {
+            if let Some(policy) = variant.representation.precision_policy() {
+                let adaptive = cdad_logistic_trajectories(&x0, &r, steps, thresholds, policy)
+                    .with_context(|| {
+                        format!(
+                            "trajetória adaptativa de {} r={r}",
+                            variant.representation.tag()
+                        )
+                    })?;
+                for (index, (trajectory, metrics)) in adaptive.iter().enumerate() {
+                    let threshold = &thresholds[index];
+                    let counts = score(
+                        &trajectory.states,
+                        &trajectory.decisions[0],
+                        &reference,
+                        index,
+                        true,
+                    );
+                    records.push(record(
+                        variant,
+                        &spec,
+                        regime,
+                        threshold,
+                        threshold == principal,
+                        trajectory.states.len(),
+                        counts,
+                        Some(metrics),
+                    )?);
+                }
+                continue;
+            }
             let trajectory =
                 trajectory_for(variant, &x0, &r, steps, thresholds).with_context(|| {
                     format!(
@@ -1698,6 +2071,7 @@ fn sweep_logistic(
                     threshold == principal,
                     states,
                     counts,
+                    None,
                 )?);
             }
         }
@@ -1729,7 +2103,10 @@ fn sweep_affine(
         let parameters = AffineParameters::new(
             alpha.numer().to_u64().context("numerador de alpha")?,
             alpha.denom().to_u64().context("denominador de alpha")?,
-            innovation.numer().to_u64().context("numerador da inovação")?,
+            innovation
+                .numer()
+                .to_u64()
+                .context("numerador da inovação")?,
             innovation
                 .denom()
                 .to_u64()
@@ -1739,6 +2116,31 @@ fn sweep_affine(
             .with_context(|| format!("referência MPFR para alpha={alpha}"))?;
         let spec = WorkloadSpec::stable_affine(alpha.clone(), innovation.clone(), x0.clone());
         for variant in variants {
+            if let Some(policy) = variant.representation.precision_policy() {
+                let adaptive =
+                    cdad_affine_trajectories(&x0, &alpha, &innovation, steps, thresholds, policy)?;
+                for (index, (trajectory, metrics)) in adaptive.iter().enumerate() {
+                    let threshold = &thresholds[index];
+                    let counts = score(
+                        &trajectory.states,
+                        &trajectory.decisions[0],
+                        &reference,
+                        index,
+                        true,
+                    );
+                    records.push(record(
+                        variant,
+                        &spec,
+                        regime,
+                        threshold,
+                        threshold == principal,
+                        trajectory.states.len(),
+                        counts,
+                        Some(metrics),
+                    )?);
+                }
+                continue;
+            }
             let trajectory = affine_trajectory_for(
                 variant,
                 &x0,
@@ -1772,6 +2174,7 @@ fn sweep_affine(
                     threshold == principal,
                     states,
                     counts,
+                    None,
                 )?);
             }
         }
@@ -1800,7 +2203,8 @@ fn main() -> Result<()> {
     let mut records = Vec::new();
     let logistic = selected(logistic_variants(), args.only.as_deref());
     let affine = selected(affine_variants(), args.only.as_deref());
-    if logistic.is_empty() && affine.is_empty() {
+    let decisions = selected(decision_variants(), args.only.as_deref());
+    if logistic.is_empty() && affine.is_empty() && decisions.is_empty() {
         bail!("nenhuma representação corresponde a --only");
     }
     if !logistic.is_empty() {
@@ -1821,7 +2225,6 @@ fn main() -> Result<()> {
             &mut records,
         )?;
     }
-    let decisions = selected(decision_variants(), args.only.as_deref());
     if !decisions.is_empty() {
         sweep_decisions(&decisions, &args.adult_model, args.ecef_cases, &mut records)?;
     }

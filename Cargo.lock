@@ -504,15 +504,18 @@ dependencies = [
  "anyhow",
  "clap",
  "csv",
+ "libc",
  "nova-circuit",
  "num-bigint 0.4.6",
  "num-rational",
  "num-traits",
+ "numeric-approximations",
  "numeric-core",
  "numeric-reference",
  "rug",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -1015,6 +1018,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "numeric-approximations"
+version = "0.1.0"
+dependencies = [
+ "num-bigint 0.4.6",
+ "num-rational",
+ "num-traits",
+ "numeric-core",
+ "numeric-reference",
+ "rug",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "numeric-bench"
 version = "0.1.0"
 dependencies = [
@@ -1032,6 +1049,7 @@ dependencies = [
  "num-traits",
  "proptest",
  "serde",
+ "serde_json",
  "sha2",
  "thiserror 2.0.18",
 ]
@@ -1043,6 +1061,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "num-rational",
  "num-traits",
+ "numeric-core",
  "rug",
  "serde",
  "softfloat",

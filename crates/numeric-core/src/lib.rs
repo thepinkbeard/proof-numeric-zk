@@ -1,8 +1,15 @@
 //! Aritmética fracionária em limbs com perda de precisão explícita.
 
 mod cbd;
+mod cdad;
 mod cfd;
+mod fixed_semantics;
 mod frontier;
+mod numeric_contract;
+mod contract_certificate;
+mod contract_adaptive;
+pub use contract_adaptive::{ContractPrecisionPolicy, ContractEvaluation, CheckedAdaptiveDecision,
+    select_checked_precision, CONTRACT_PRECISION_LADDER};
 mod profile;
 
 use num_bigint::{BigInt, BigUint, Sign};
@@ -12,11 +19,29 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub use cbd::{CbdError, CertifiedDyadic, Decision3, NumericProfile, OverflowPolicy};
+pub use contract_certificate::{CheckedEnclosure, CertificateError, SigmoidRelationContract,
+    SigmoidCertificate, BoundBreakdown, exact_ecef_squared_distance};
+pub use cdad::{
+    AdaptiveDecision, CdadError, CertifiedAdaptiveDyadic, CommitmentPolicy,
+    DecisionAdaptiveProfile, PrecisionPolicy, PrecisionSelection, SelectionReason,
+};
 pub use cfd::{CertifiedFloat, CfdError, CfdOperation, CfdProfile, CfdRoundingPolicy};
+pub use fixed_semantics::{
+    FixedPointError, FixedPointFormat, FixedPointQuantization, SignedFixedPoint,
+};
 pub use frontier::{FrontierPoint, RepresentationId, WorkloadSpec};
+pub use numeric_contract::{
+    threshold_margin, top_two_margin, ApproximationMethod, ApproximationSpec, BoundRule,
+    CompositionRule, ContractError, DecisionBoundarySpec, DecisionCertification,
+    DecisionMarginEvaluation, ErrorComponent, ErrorContract, EvidenceLevel, ExceptionalValuePolicy,
+    FunctionId, NumericContractProfile, NumericContractProfileBuilder, NumericRepresentationKind,
+    OperationSemantics, OverflowMode, ProfileProvenance, QuantizationRounding, RationalSpec,
+    RepresentationSpec, RescalingMode, SemanticClass, SourceKind, UnderflowMode, ValidDomain,
+    NUMERIC_CONTRACT_SCHEMA_VERSION,
+};
 pub use profile::{
     BoundMode, ExperimentProfile, ExperimentProfileBuilder, ProfileError, ProfileFamily,
-    RoundingId, Topology, WorkloadId, PROFILE_SCHEMA_VERSION,
+    RoundingId, Topology, WorkloadId, ADAPTIVE_PROFILE_SCHEMA_VERSION, PROFILE_SCHEMA_VERSION,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

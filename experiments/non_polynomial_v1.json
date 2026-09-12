@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "matrix_id": "non-polynomial-semantics-v1",
+  "reference_precision_bits": 256,
+  "validation_precision_bits": 512,
+  "functions": [
+    {
+      "function": "exp",
+      "domain": {
+        "minimum": { "numerator": "-1", "denominator": "1" },
+        "maximum": { "numerator": "1", "denominator": "1" },
+        "minimum_inclusive": true,
+        "maximum_inclusive": true
+      },
+      "thresholds": [
+        { "numerator": "1", "denominator": "2" },
+        { "numerator": "1", "denominator": "1" },
+        { "numerator": "2", "denominator": "1" }
+      ]
+    },
+    {
+      "function": "sigmoid",
+      "domain": {
+        "minimum": { "numerator": "-1", "denominator": "1" },
+        "maximum": { "numerator": "1", "denominator": "1" },
+        "minimum_inclusive": true,
+        "maximum_inclusive": true
+      },
+      "thresholds": [
+        { "numerator": "3", "denominator": "10" },
+        { "numerator": "1", "denominator": "2" },
+        { "numerator": "7", "denominator": "10" }
+      ]
+    }
+  ],
+  "formats": [
+    { "label": "q8.8", "integer_bits": 8, "fractional_bits": 8 },
+    { "label": "q16.16", "integer_bits": 16, "fractional_bits": 16 },
+    { "label": "q32.32", "integer_bits": 32, "fractional_bits": 32 },
+    { "label": "q64.64", "integer_bits": 64, "fractional_bits": 64 },
+    { "label": "q120.120", "integer_bits": 120, "fractional_bits": 120 }
+  ],
+  "roundings": ["floor", "nearest-ties-to-even"],
+  "methods": [
+    { "method": "taylor", "orders": [3, 5, 7, 9, 13] },
+    { "method": "pade-diagonal", "orders": [2, 3, 4, 5, 8] },
+    { "method": "gauss-legendre-implicit", "orders": [2, 4, 8, 16, 32] }
+  ],
+  "explicit_configurations": [],
+  "sampling": {
+    "grid_points": 1025,
+    "random_samples": 100,
+    "boundary_offset_bits": [8, 16, 32]
+  },
+  "timing": {
+    "repetitions": 30,
+    "batch_size": 100
+  }
+}

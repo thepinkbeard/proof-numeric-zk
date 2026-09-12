@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "profile_id": "q8.8-exp-taylor-3-sridhar-paper-floor-audit-v2",
+  "profile_version": 1,
+  "representation": {
+    "kind": "signed-fixed-point",
+    "signed": true,
+    "integer_bits": 8,
+    "fractional_bits": 8,
+    "scale_power": 8
+  },
+  "operations": {
+    "rounding": "floor",
+    "rescaling": "after-every-multiplication",
+    "division_rounding": "floor",
+    "overflow": "reject",
+    "underflow": "quantize-to-grid",
+    "exceptional_values": "reject-non-finite"
+  },
+  "valid_domain": {
+    "minimum": {
+      "numerator": "-1",
+      "denominator": "1"
+    },
+    "maximum": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "minimum_inclusive": true,
+    "maximum_inclusive": true
+  },
+  "approximation": {
+    "function": "exp",
+    "method": "taylor",
+    "method_version": 2,
+    "order": 3,
+    "expansion_center": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "evaluation_form": "horner-rounded-after-each-multiplication",
+    "parameters": {},
+    "coefficient_or_node_source": "exact-rational-series"
+  },
+  "error_contract": {
+    "quantization": {
+      "rule": {
+        "kind": "named",
+        "rule_id": "fixed-grid-rounding-bound",
+        "parameters": {}
+      },
+      "evidence": "analytical",
+      "provenance": "repository-derived",
+      "citation": "Exact grid bound from the declared rounding rule"
+    },
+    "approximation": {
+      "rule": {
+        "kind": "named",
+        "rule_id": "exp-taylor-lagrange-remainder-on-minus-one-one",
+        "parameters": {}
+      },
+      "evidence": "analytical",
+      "provenance": "repository-derived",
+      "citation": "Lagrange remainder with exp(x) <= 3 on [-1,1]"
+    },
+    "verification_slack": {
+      "rule": {
+        "kind": "absolute",
+        "value": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "evidence": "analytical",
+      "provenance": "repository-derived",
+      "citation": "off-circuit deterministic evaluation"
+    },
+    "accumulated_error": {
+      "rule": {
+        "kind": "named",
+        "rule_id": "exp-taylor-fixed-horner-conservative-bound-v1",
+        "parameters": {}
+      },
+      "evidence": "analytical",
+      "provenance": "our-extension",
+      "citation": "Repository derivation documented in numeric semantics methodology"
+    },
+    "composition_rule": "conservative-sum"
+  },
+  "provenance": [
+    {
+      "source_kind": "repository-derived",
+      "citation": "proof-numeric-zk baseline",
+      "locator": "taylor",
+      "note": "Formula provenance; decision analysis is an extension of this repository"
+    },
+    {
+      "source_kind": "paper-derived",
+      "citation": "Sridhar paper fixed-point encoding floor(a*2^s)",
+      "locator": "rounding",
+      "note": "Paper and artifact rounding are intentionally separate profiles"
+    }
+  ]
+}

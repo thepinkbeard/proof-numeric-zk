@@ -1,0 +1,10 @@
+[
+  {
+    "numeric_profile_hash_hex": "f02422bfc9f5294b2b23fb4e6338dc9fe6dbfb747214537a46809768d111d4f1",
+    "repetitions": 0,
+    "batch_size": 25,
+    "median_batch_ns": 0,
+    "p05_batch_ns": 0,
+    "p95_batch_ns": 0
+  }
+]
