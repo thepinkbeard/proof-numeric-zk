@@ -11,6 +11,10 @@ provas comprimidas verificáveis em processo separado e gráficos Gnuplot PDF/SV
 O [Grupo A auditado](docs/progress/0029-grupo-a-figuras-auditadas.md) acrescenta
 as figuras 1–4 do plano bibliográfico: trajetórias, resultados de decisão,
 cobertura por regime e margem versus incerteza, sem reexecutar a dinâmica.
+O [primeiro piloto do Grupo B](docs/progress/0030-grupo-b-piloto-composicional.md)
+acrescenta as figuras 5–7: witnesses aceitos, Taylor/Padé/GL no mesmo formato e
+cobertura da média de quatro sigmoids. São certificados **off-circuit** e uma
+amostra pequena; não constitui reprodução de backend externo ou ganho de tempo.
 Para uma entrega nova, sem sobrescrever resultados:
 
 ```bash
@@ -63,7 +67,8 @@ benchmarks homogêneos.
 
 - [Plano de execução da tese](docs/thesis-execution-plan.md)
 - [Diário de progresso e ponto de retomada](docs/progress/README.md)
-- [Último avanço: figuras auditadas do Grupo A](docs/progress/0029-grupo-a-figuras-auditadas.md)
+- [Último avanço: piloto composicional do Grupo B](docs/progress/0030-grupo-b-piloto-composicional.md)
+- [Figuras auditadas do Grupo A](docs/progress/0029-grupo-a-figuras-auditadas.md)
 - [Especificação CFD](docs/cfd-mathematical-specification.md)
 - [Especificação CDAD](docs/cdad-mathematical-specification.md)
 - [Protocolo experimental CDAD](docs/cdad-protocol.md)
