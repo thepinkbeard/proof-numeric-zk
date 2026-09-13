@@ -45,6 +45,51 @@ python3 scripts/plot_qualification.py --input-dir results/numerico-NOVO --output
 Sem uma campanha fornecida por `--timing-dir`, gráficos de custo mostram
 explicitamente que não houve medição. Isso não satisfaz a entrega final de custos.
 
+### Figuras 1–4 do registro 0028: reanalisar dados existentes
+
+O analisador do Grupo A verifica os hashes da matriz, inputs, dados brutos e
+perfis, confere os predicados usando os endpoints racionais e exporta somente
+tabelas derivadas compactas. A referência usa o enclosure dirigido, nunca só
+seu ponto médio. Não reexecuta trajetórias, provas ou timings.
+
+```bash
+python3 scripts/qualification_group_a.py prepare \
+  --input-dir results/qualification_full_v1 \
+  --timing-dir results/qualification_timing_v1 \
+  --output-dir results/qualification_group_a_data-NOVO
+python3 scripts/qualification_group_a.py render \
+  --analysis-dir results/qualification_group_a_data-NOVO \
+  --output-dir results/qualification_group_a_figures-NOVO \
+  --pdf-output output/pdf/qualification_group_a-NOVO.pdf
+python3 -m unittest discover -s scripts -p 'test_qualification_group_a.py' -v
+```
+
+A preparação usa apenas a biblioteca padrão Python. A renderização usa
+Gnuplot; `--pdf-output` e o teste de concatenação requerem também `pypdf`.
+Sem `--pdf-output`, os quatro PDFs/SVGs individuais continuam sendo produzidos.
+Os diretórios precisam ser novos. Se os dados históricos não estiverem
+disponíveis, primeiro reproduzir a avaliação pelo protocolo original.
+
+Configuração pública da análise: `experiments/qualification_group_a_v1.json`.
+`prepare` recusa rejeições, oportunidades faltantes/duplicadas e hashes
+inconsistentes; exige o grupo aleatório, sem substituí-lo silenciosamente pelo
+histórico. Cada oportunidade pertence a uma categoria de decisão, enquanto a
+contagem de contratos definitivos permanece separada da conclusão da referência.
+Metadados ausentes nunca promovem um timing a certificado.
+
+`summary.csv/json` mantém conjuntos, parâmetros, inovação afim, horizontes e
+famílias separados. CDAD agrega sobre a precisão escolhida, mas preserva os
+hashes dos perfis de origem e as médias de precisão/avaliações. `margins.csv/json`
+inclui racionais exatos e número da linha de origem para auditoria. Doubles são
+usados apenas na apresentação. As trajetórias históricas contêm valores
+aproximados de visualização; os marcadores de flips usam as decisões exatas nos
+horizontes disponíveis. As figuras não alegam novas provas ZK.
+
+`render` confere os hashes das tabelas antes de produzir `.dat`, `.gp`, PDF,
+SVG, relatório e manifesto. Falhas não recebem manifesto de conclusão.
+As figuras finais desta rodada e sua leitura estão no
+[registro 0029](progress/0029-grupo-a-figuras-auditadas.md).
+
 ## Matriz e amostragem
 
 `experiments/qualification_v1.json` fixa parâmetros, horizontes, seeds e

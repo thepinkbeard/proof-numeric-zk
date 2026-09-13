@@ -8,6 +8,9 @@ computação iterativa verificável.
 O [relatório para o orientador](docs/qualification-results.md) sintetiza a evidência e seus limites.
 O [guia de qualificação](docs/qualification.md) reúne a matriz dinâmica,
 provas comprimidas verificáveis em processo separado e gráficos Gnuplot PDF/SVG.
+O [Grupo A auditado](docs/progress/0029-grupo-a-figuras-auditadas.md) acrescenta
+as figuras 1–4 do plano bibliográfico: trajetórias, resultados de decisão,
+cobertura por regime e margem versus incerteza, sem reexecutar a dinâmica.
 Para uma entrega nova, sem sobrescrever resultados:
 
 ```bash
@@ -60,7 +63,7 @@ benchmarks homogêneos.
 
 - [Plano de execução da tese](docs/thesis-execution-plan.md)
 - [Diário de progresso e ponto de retomada](docs/progress/README.md)
-- [Último avanço: Certified Floating Dyadic](docs/progress/0016-certified-floating-dyadic.md)
+- [Último avanço: figuras auditadas do Grupo A](docs/progress/0029-grupo-a-figuras-auditadas.md)
 - [Especificação CFD](docs/cfd-mathematical-specification.md)
 - [Especificação CDAD](docs/cdad-mathematical-specification.md)
 - [Protocolo experimental CDAD](docs/cdad-protocol.md)

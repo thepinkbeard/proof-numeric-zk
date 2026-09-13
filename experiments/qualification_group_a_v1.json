@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "analysis_id": "qualification-group-a-v1",
+  "numeric_protocol": "qualification-dynamics-v1",
+  "sample_set": "sample",
+  "horizons": [10, 30, 100, 300, 1000],
+  "trajectory": {
+    "input_id": "historical-0",
+    "workload": "logistic",
+    "parameters": ["7/2", "39/10"],
+    "threshold": "1/2",
+    "maximum_iteration": 100,
+    "methods": [["fixed-truncate", 16], ["fixed-rne", 16], ["fp32", 24], ["cbd-local", 16]]
+  },
+  "outcomes": {
+    "workload": "logistic",
+    "parameter": "39/10",
+    "threshold": "1/2",
+    "methods": [["fixed-truncate", 16], ["fixed-rne", 16], ["fp32", 24], ["cbd-local", 16], ["cbd-local", 64], ["cbd-sequential", 16], ["cfd", 24], ["cdad-sequential", null], ["cdad-margin-directed", null], ["cdad-preview-all", null]]
+  },
+  "coverage": {
+    "family": "cbd-local",
+    "precisions": [16, 32, 48, 64],
+    "panels": [
+      {"workload": "logistic", "parameter": "7/2", "innovation": null, "threshold": "1/2"},
+      {"workload": "logistic", "parameter": "37/10", "innovation": null, "threshold": "1/2"},
+      {"workload": "logistic", "parameter": "39/10", "innovation": null, "threshold": "1/2"},
+      {"workload": "logistic", "parameter": "4", "innovation": null, "threshold": "1/2"},
+      {"workload": "affine", "parameter": "1/2", "innovation": "3/4", "threshold": "5/4"},
+      {"workload": "affine", "parameter": "7/10", "innovation": "1/2", "threshold": "5/4"}
+    ]
+  },
+  "margin": {
+    "workload": "logistic",
+    "parameter": "39/10",
+    "threshold": "1/2",
+    "methods": [["cbd-local", 16], ["cbd-local", 64], ["fixed-rne", 16], ["fp32", 24]],
+    "display_floor": 1e-20
+  },
+  "timing_scenario": "boundary-10",
+  "proof_scope": "No new proofs; numerical trajectories are not cryptographically verified by this analysis."
+}

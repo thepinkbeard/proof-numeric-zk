@@ -8,6 +8,7 @@ import statistics
 import subprocess
 from collections import defaultdict
 from pathlib import Path
+from qualification_metrics import summarize_timing
 
 def quoted(s):
     return '"' + str(s).replace('\\', '\\\\').replace('"','\\"').replace('\n',' ') + '"'
@@ -132,16 +133,13 @@ def main():
         for r in records:
             if not r["warmup"] and r["scenario"]=="boundary-10":buckets[(r["scenario"],r["policy"],r["fixed_precision"])].append(r)
         for (scenario,policy,bits),rs in buckets.items():
-            cost=statistics.mean(r["complete_wall_seconds"] for r in rs)
-            cov=sum(r["decision"]!="Indeterminate" and not r.get("predicate_flip",False) for r in rs)/len(rs)
+            measured=summarize_timing(rs)
+            cost=measured["mean_total"]
+            cov=measured["certified_decisions"]/len(rs)
             label=policy.removeprefix("baseline-")+(f' F{bits}' if bits!=24 else ' p24')
             costs[label].append((statistics.mean(r["primary_constraints"] for r in rs),cost))
-            if all(r.get("certified_family",True) for r in rs):pareto[label].append((cost,cov))
-            timing_summary.append({"label":label,"mean_total":cost,
-                "mean_no_setup":statistics.mean(r["setup_excluded_seconds"] for r in rs),
-                "mean_primary_constraints":statistics.mean(r["primary_constraints"] for r in rs),
-                "certified_decisions":sum(r["decision"]!="Indeterminate" for r in rs),
-                "flips":sum(bool(r.get("predicate_flip",False)) for r in rs)})
+            if measured["certified_family"]:pareto[label].append((cost,cov))
+            timing_summary.append({"label":label,**measured})
         cost_scope=f"boundary-10, r=4; {timing_manifest['rounds']} rounds"
     figure(a.output_dir,6,f"Actual proof costs: {cost_scope}","sum augmented constraints per step across attempts","seconds (includes setup)",costs)
     figure(a.output_dir,7,f"Cost and certified availability: {cost_scope}","full seconds (includes setup)","definitive fraction",pareto)
@@ -180,10 +178,10 @@ fontes primárias e limites da entrega.
     text+="\nPrecisão FP32=24 significa bits do significando; não 24 bits fracionários. Zero definitivas certificadas nos baselines sem bound não significa zero acertos observados.\n"
     if timing_summary:
         text+="\n## Custos observados da campanha\n\n"
-        text+="Cenário: boundary-10, com 30 rodadas sem aquecimento. Médias por configuração; setup é mostrado separadamente e não foi reutilizado.\n\n"
-        text+="| Configuração | Tempo total (s) | Sem setup (s) | Constraints aumentadas | Decisões certificadas | Flips observados |\n|---|---:|---:|---:|---:|---:|\n"
+        text+=f"Cenário: boundary-10, com {timing_manifest['rounds']} rodadas sem aquecimento. Médias por configuração; setup é mostrado separadamente e não foi reutilizado. Repetições não são entradas independentes.\n\n"
+        text+="| Configuração | Tempo total (s) | Sem setup (s) | Constraints aumentadas | Decisões certificadas | Definitivas sem contrato certificado | Flips observados |\n|---|---:|---:|---:|---:|---:|---:|\n"
         for r in sorted(timing_summary,key=lambda x:x["label"]):
-            text+=f'| {r["label"]} | {r["mean_total"]:.4f} | {r["mean_no_setup"]:.4f} | {r["mean_primary_constraints"]:.0f} | {r["certified_decisions"]} | {r["flips"]} |\n'
+            text+=f'| {r["label"]} | {r["mean_total"]:.4f} | {r["mean_no_setup"]:.4f} | {r["mean_primary_constraints"]:.0f} | {r["certified_decisions"]} | {r["observed_decisions"]} | {r["flips"]} |\n'
         text+="\nEsses tempos são deste cenário público e deste host; não sustentam uma afirmação de ganho populacional.\n"
     (a.output_dir/"report.md").write_text(text)
     (a.output_dir/"manifest.json").write_text(json.dumps({"status":"figures-complete","gnuplot":subprocess.check_output(["gnuplot","--version"],text=True).strip(),"input_manifest":manifest,"cost_data_provided":bool(a.timing_dir)},indent=2))

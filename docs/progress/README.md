@@ -41,6 +41,8 @@ Este diretório é o ponto de retomada para pessoas e agentes automatizados.
 | [0025](0025-semantica-numerica-funcoes.md) | 2026-09-01 | v1 off-circuit concluída | Numeric contract, exp/sigmoid, Taylor, Padé, Gauss-Legendre e decisão |
 | [0026](0026-cdad-contract-audit.md) | 2026-09-08 | auditoria off-circuit | Checker composicional, quatro políticas, referência dirigida e gates competitivos |
 | [0027](0027-qualification.md) | 2026-09-11 | pacote dinâmico | Matriz completa, prova vinculada pública, gráficos e campanha reproduzível |
+| [0028](0028-comparacoes-literatura-e-graficos.md) | 2026-09-13 | pesquisa documentada; execução pendente | Literatura, dez figuras propostas, baselines competitivos e critérios de comparação |
+| [0029](0029-grupo-a-figuras-auditadas.md) | 2026-09-13 | Grupo A concluído | Classificação corrigida, auditoria racional, figuras 1–4 PDF/SVG e reprodução das tabelas |
 
 O capítulo consolidado está em
 [`../chapter-certified-frontier.md`](../chapter-certified-frontier.md).
