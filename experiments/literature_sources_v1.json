@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "sridhar": {
+      "url": "https://github.com/SS-C4/non-linear-artifact.git",
+      "commit": "03d876442a5d64f535eaf67b8adc4e41e0b70bf8",
+      "version": "final-art",
+      "paper": "Sridhar et al., USENIX Security 2026",
+      "archive": "https://doi.org/10.5281/zenodo.21706296"
+    },
+    "zkml": {
+      "url": "https://github.com/uiuc-kang-lab/zkml.git",
+      "commit": "50d0cf30e2bbcb8b1f31839b775c1d018b720527",
+      "paper": "Chen et al., EuroSys 2024",
+      "version": "repository snapshot; not asserted to be the paper-time commit"
+    },
+    "nfgen": {
+      "url": "https://github.com/Fannxy/NFGen.git",
+      "commit": "4d80157aed4b48fd21b250137a787bb03229a4af",
+      "paper": "Fan et al., CCS 2022 (MPC, not ZK)",
+      "version": "repository snapshot; SampledPolyFit component"
+    }
+  }
+}

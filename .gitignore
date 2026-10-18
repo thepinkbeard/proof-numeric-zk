@@ -9,3 +9,7 @@
 # Regenerable qualification runs contain multi-GB exact rational data and proofs.
 /results/qualification*/
 /scripts/__pycache__/
+
+# macOS e rascunhos locais
+.DS_Store
+/tmp/

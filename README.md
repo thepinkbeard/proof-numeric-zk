@@ -15,6 +15,22 @@ O [primeiro piloto do Grupo B](docs/progress/0030-grupo-b-piloto-composicional.m
 acrescenta as figuras 5–7: witnesses aceitos, Taylor/Padé/GL no mesmo formato e
 cobertura da média de quatro sigmoids. São certificados **off-circuit** e uma
 amostra pequena; não constitui reprodução de backend externo ou ganho de tempo.
+
+A [comparação acadêmica executada](docs/progress/0031-comparacao-componentes-literatura.md)
+acrescenta componentes oficiais de **Sridhar (USENIX Security 2026), ZKML
+(EuroSys 2024) e NFGen (CCS 2022, MPC)**, com 1.000 vetores aleatórios e casos
+adversariais separados. Veja os [seis gráficos PDF](output/pdf/literature_comparison_v3.pdf)
+e o [protocolo de comparação](docs/literature-comparison-protocol.md).
+As relações Sridhar foram executadas em Noir; ZKML reproduz o gerador de tabela;
+NFGen reproduz o gerador/preditor numérico. **Não é reprodução integral de três
+backends nem medição de proving.** O lookup com contrato já supera nosso GL8 F16
+em cobertura aleatória; a adaptação recupera essa cobertura, sem vantagem de
+tempo demonstrada.
+
+```bash
+bash scripts/run_literature_comparison.sh results/qualification_literature_NOVO
+```
+
 Para uma entrega nova, sem sobrescrever resultados:
 
 ```bash
@@ -67,7 +83,8 @@ benchmarks homogêneos.
 
 - [Plano de execução da tese](docs/thesis-execution-plan.md)
 - [Diário de progresso e ponto de retomada](docs/progress/README.md)
-- [Último avanço: piloto composicional do Grupo B](docs/progress/0030-grupo-b-piloto-composicional.md)
+- [Último avanço: comparação executada com a literatura](docs/progress/0031-comparacao-componentes-literatura.md)
+- [Piloto composicional do Grupo B](docs/progress/0030-grupo-b-piloto-composicional.md)
 - [Figuras auditadas do Grupo A](docs/progress/0029-grupo-a-figuras-auditadas.md)
 - [Especificação CFD](docs/cfd-mathematical-specification.md)
 - [Especificação CDAD](docs/cdad-mathematical-specification.md)

@@ -44,6 +44,7 @@ Este diretório é o ponto de retomada para pessoas e agentes automatizados.
 | [0028](0028-comparacoes-literatura-e-graficos.md) | 2026-09-13 | pesquisa documentada; execução pendente | Literatura, dez figuras propostas, baselines competitivos e critérios de comparação |
 | [0029](0029-grupo-a-figuras-auditadas.md) | 2026-09-13 | Grupo A concluído | Classificação corrigida, auditoria racional, figuras 1–4 PDF/SVG e reprodução das tabelas |
 | [0030](0030-grupo-b-piloto-composicional.md) | 2026-09-13 | piloto off-circuit concluído; Grupo B parcial | Sigmoid, witnesses aceitos, comparação Taylor/Padé/GL, cobertura bits × ordem e figuras 5–7 |
+| [0031](0031-comparacao-componentes-literatura.md) | 2026-09-18 | campanha de componentes F16 concluída | Artefatos Sridhar/ZKML/NFGen, validação Noir, contratos de tabela, composição, replay e seis gráficos comparativos |
 
 O capítulo consolidado está em
 [`../chapter-certified-frontier.md`](../chapter-certified-frontier.md).

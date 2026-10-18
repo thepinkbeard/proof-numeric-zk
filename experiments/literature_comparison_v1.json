@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "domain": ["0", "1"],
+  "thresholds": ["11/20", "5/8", "7/10"],
+  "seeds": [20260908,20260909,20260910,20260911,20260912,20260913,20260914,20260915,20260916,20260917],
+  "vectors_per_seed": 100,
+  "grid_intervals": 1024,
+  "fractional_bits": 16,
+  "reference_bits": 256,
+  "confirmation_bits": 512,
+  "reference_max_bits": 16384,
+  "search_ulps": 256,
+  "adaptive_ladder": [16,32,48,64],
+  "our_gl_order": 8,
+  "nfgen_degrees": [3,5,7,9],
+  "nfgen_tolerance": "1/1000",
+  "proof_count": 0
+}

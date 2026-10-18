@@ -241,6 +241,35 @@ impl SigmoidRelationContract {
         expected_input: &BigRational,
         certificate: &SigmoidCertificate,
     ) -> Result<(CheckedEnclosure, BoundBreakdown), CertificateError> {
+        self.check_with_bound(expected_input, certificate, &self.quadrature_error_bound()?)
+    }
+
+    /// Amortize only the public moment calculation. Every witness, input,
+    /// domain, hash and claimed radius is still checked by the same kernel.
+    /// The cached bound is private and cannot be supplied by an untrusted caller.
+    pub fn check_batch(
+        &self,
+        expected_inputs: &[BigRational],
+        certificates: &[SigmoidCertificate],
+    ) -> Result<Vec<(CheckedEnclosure, BoundBreakdown)>, CertificateError> {
+        require(
+            expected_inputs.len() == certificates.len(),
+            "batch length mismatch",
+        )?;
+        let bound = self.quadrature_error_bound()?;
+        expected_inputs
+            .iter()
+            .zip(certificates)
+            .map(|(x, c)| self.check_with_bound(x, c, &bound))
+            .collect()
+    }
+
+    fn check_with_bound(
+        &self,
+        expected_input: &BigRational,
+        certificate: &SigmoidCertificate,
+        quadrature_bound: &BigRational,
+    ) -> Result<(CheckedEnclosure, BoundBreakdown), CertificateError> {
         self.validate()?;
         require(
             certificate.contract_hash == self.hash_hex(),
@@ -283,7 +312,7 @@ impl SigmoidRelationContract {
         )?;
         let mass: BigRational = self.weights.iter().cloned().sum();
         // logit's derivative is >=4 on (0,1): inverse conversion factor 1/4.
-        let approximation = self.quadrature_error_bound()? / ratio(4, 1);
+        let approximation = quadrature_bound / ratio(4, 1);
         let verification = (ratio(2, 1) * mass * &self.term_slack + &self.sum_slack) / ratio(4, 1);
         let input = quantized.exact_error.abs() / ratio(4, 1);
         let required_radius = &approximation + &verification + &input;
@@ -384,6 +413,26 @@ mod tests {
         assert!(changed.check(&ratio(0, 1), &good).is_err());
         changed.weights[0] = ratio(-1, 1);
         assert!(changed.quadrature_error_bound().is_err());
+    }
+    #[test]
+    fn batch_checker_preserves_checks_and_rejects_wrong_lengths() {
+        let c = contract();
+        let good = SigmoidCertificate {
+            contract_hash: c.hash_hex(),
+            canonical_input: ratio(0, 1),
+            output: ratio(1, 2),
+            terms: vec![ratio(0, 1); 2],
+            claimed_radius: ratio(1, 4),
+        };
+        let one = c.check(&ratio(0, 1), &good).unwrap();
+        let batch = c.check_batch(&[ratio(0, 1)], &[good.clone()]).unwrap();
+        assert_eq!(batch[0].0, one.0);
+        assert_eq!(batch[0].1.required_radius, one.1.required_radius);
+        assert!(c.check_batch(&[], &[good.clone()]).is_err());
+        assert!(c.check_batch(&[ratio(1, 2)], &[good.clone()]).is_err());
+        let mut bad = good;
+        bad.claimed_radius = ratio(0, 1);
+        assert!(c.check_batch(&[ratio(0, 1)], &[bad]).is_err());
     }
     #[test]
     fn local_slack_is_amplified_by_composition() {

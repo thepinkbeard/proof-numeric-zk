@@ -50,3 +50,7 @@ path = "src/bin/contract_audit.rs"
 [[bin]]
 name = "group-b-eval"
 path = "src/bin/group_b_eval.rs"
+
+[[bin]]
+name = "literature-bridge"
+path = "src/bin/literature_bridge.rs"
